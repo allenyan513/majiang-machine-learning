@@ -1,7 +1,10 @@
-# 日本立直麻将（Riichi）规则研究
+# 第 14 章 日本立直麻将：规则研究与实现范围
 
-给熟悉中国麻将、不熟悉日麻的人看的。目标是两件事：理解它和推倒胡差在哪，以及为我们的引擎划出实现范围。
-以天凤（Tenhou）的四人东/南场规则为准——这是 Suphx、Mortal 等 AI 训练和评估用的规则。
+> 这一章还没有对应代码。它是下一个大阶段（重写引擎）的设计输入。
+
+第 13 章的结论是要换一套让防守有分量的规则。麻将 AI 研究界有两个标准：**日本立直麻将**（Suphx、Mortal、NAGA、mjx 全用它，有天凤上千万局公开牌谱）和**中国国标**（IJCAI/Botzone 比赛用，81 番型、8 番起胡，公开数据少）。我们选立直麻将：参考实现多、有外部标尺（可以和开源的 Mortal 对战）、计分天然要求防守。
+
+这一章给熟悉中国麻将、不熟悉日麻的人看。目标是两件事：理解它和推倒胡差在哪，以及为引擎划出实现范围。以天凤（Tenhou）的四人东/南场规则为准。
 
 ---
 
@@ -231,3 +234,16 @@ AI：
 | 断幺九 tanyao | タンヤオ | 全 2–8 |
 | 役牌 yakuhai | ヤクハイ | 三元牌/自风/场风 |
 | 平和 pinfu | ピンフ | 全顺子两面听 |
+
+---
+
+## 参考
+
+- [Mjx: A framework for Mahjong AI research](https://github.com/mjx-project/mjx) — 东大出的 C++ 模拟器，可用于交叉验证引擎
+- [Mortal](https://github.com/Equim-chan/Mortal) — 最强的开源立直麻将 AI，可作对手和参考实现
+- [Kanachan](https://github.com/Cryolite/kanachan) — 另一个开源框架，含天凤牌谱处理
+- [Mahjax](https://arxiv.org/abs/2605.20577) — 2026 年的 JAX GPU 模拟器
+- [Botzone 国标麻将比赛](https://botzone.org.cn/static/gamecontest2026a.html) — 如果以后想走国标路线
+- Li et al., *Suphx: Mastering Mahjong with Deep Reinforcement Learning*, 2020
+
+← 上一章：[改进老师：规则决定了上限](13-defense.md) · 回到 [第 0 章 全景](00-overview.md)

@@ -4,8 +4,31 @@
     {
       "name": "viz",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "majiang.viz.server", "--model", "models/discard.pt", "--agents", "nn,nn,rule,rule", "--port", "8000"],
+      "runtimeArgs": [
+        "run",
+        "python",
+        "-m",
+        "majiang.viz.server",
+        "--model",
+        "models/discard.pt",
+        "--agents",
+        "nn,nn,rule,rule",
+        "--port",
+        "8000"
+      ],
       "port": 8000
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8080",
+        "--directory",
+        "docs"
+      ],
+      "port": 8080
     }
   ]
 }
