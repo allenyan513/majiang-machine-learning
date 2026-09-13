@@ -4,18 +4,21 @@
 <meta charset="utf-8">
 <title>麻将 AI 观战</title>
 <style>
-  :root { --bg:#1d1f24; --panel:#2a2d34; --line:#3a3e47; --txt:#e8e6e1; --muted:#9a9da6;
-          --m:#c0392b; --s:#1e8449; --p:#1f5fa8; --z:#222; --felt:#7a1f2b; --felt2:#5c1620; --gold:#e6b422; }
+  :root { --bg:#f6f8fa; --panel:#ffffff; --line:#d7dce2; --txt:#1f2328; --muted:#656d76; --accent:#1f5fa8;
+          --m:#c0392b; --s:#1e8449; --p:#1f5fa8; --z:#222; --felt:#8a2432; --felt2:#6a1a26; --gold:#e6b422; }
   * { box-sizing:border-box; }
   body { margin:0; font:14px/1.4 -apple-system,"PingFang SC",sans-serif; background:var(--bg); color:var(--txt); }
   header { display:flex; gap:10px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
   header label { color:var(--muted); font-size:13px; }
-  header input, header select { background:#1a1c21; color:var(--txt); border:1px solid var(--line); border-radius:4px; padding:3px 6px; }
+  header input, header select { background:#fff; color:var(--txt); border:1px solid var(--line); border-radius:4px; padding:3px 6px; }
+  header .nav { display:flex; gap:10px; margin-right:6px; font-size:13px; }
+  header .nav a { color:var(--accent); text-decoration:none; }
+  header .nav a:hover { text-decoration:underline; }
   header input[type=number] { width:64px; }
-  button { padding:5px 12px; border:1px solid #555; background:#3a3e47; color:var(--txt); border-radius:4px; cursor:pointer; }
-  button:hover { background:#4a4f5a; }
-  button.primary { background:#2e6bd6; border-color:#2e6bd6; }
-  button.danger { background:#b03a2e; border-color:#b03a2e; }
+  button { padding:5px 12px; border:1px solid #c9ced6; background:#fff; color:var(--txt); border-radius:4px; cursor:pointer; }
+  button:hover { background:#eef1f5; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { background:#b03a2e; border-color:#b03a2e; color:#fff; }
   #status { margin-left:auto; color:var(--muted); }
   main { display:grid; grid-template-columns: 800px minmax(320px,1fr); gap:16px; padding:12px; align-items:start; }
 
@@ -31,12 +34,12 @@
   .seat.left { grid-area:left; flex-direction:row; align-items:center; justify-content:flex-start; gap:8px; padding-left:6px; }
   .seat.right { grid-area:right; flex-direction:row-reverse; align-items:center; justify-content:flex-start; gap:8px; padding-right:6px; }
   .center { grid-area:center; display:flex; align-items:center; justify-content:center; }
-  .hub { width:190px; height:190px; border-radius:12px; background:#151515; border:3px solid var(--gold);
-         display:grid; grid-template-columns:36px 1fr 36px; grid-template-rows:36px 1fr 36px; place-items:center; color:#ddd; }
-  .hub .wall { font-size:40px; font-weight:800; color:#4dd0e1; line-height:1; }
-  .hub .sub { font-size:11px; color:#999; margin-top:4px; text-align:center; }
-  .hub .wind { font-size:16px; font-weight:700; color:#666; }
-  .hub .wind.on { color:var(--gold); text-shadow:0 0 8px var(--gold); }
+  .hub { width:190px; height:190px; border-radius:12px; background:#fffaf0; border:3px solid var(--gold);
+         display:grid; grid-template-columns:36px 1fr 36px; grid-template-rows:36px 1fr 36px; place-items:center; color:#333; }
+  .hub .wall { font-size:40px; font-weight:800; color:#1f5fa8; line-height:1; }
+  .hub .sub { font-size:11px; color:#777; margin-top:4px; text-align:center; }
+  .hub .wind { font-size:16px; font-weight:700; color:#bbb; }
+  .hub .wind.on { color:#c0392b; }
 
   .plate { position:absolute; display:flex; gap:6px; align-items:center; font-size:12px; color:#f1e7d3; white-space:nowrap;
            background:rgba(0,0,0,.35); padding:2px 8px; border-radius:10px; }
@@ -73,24 +76,25 @@
   /* ---------- 右侧面板 ---------- */
   aside { display:grid; gap:12px; align-content:start; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
-  .panel h3 { margin:0 0 8px; font-size:14px; color:#fff; }
+  .panel h3 { margin:0 0 8px; font-size:14px; color:var(--txt); }
   .muted { color:var(--muted); font-size:12px; }
   .bar { display:grid; grid-template-columns:28px 1fr 52px; gap:8px; align-items:center; margin:3px 0; }
-  .bar .track { height:16px; background:#1a1c21; border-radius:3px; overflow:hidden; }
+  .bar .track { height:16px; background:#eef1f5; border-radius:3px; overflow:hidden; }
   .bar .fill { height:100%; background:#3498db; }
   .bar.chosen .fill { background:#e74c3c; }
   .bar .pct { text-align:right; font-variant-numeric:tabular-nums; font-size:13px; }
   table { border-collapse:collapse; width:100%; font-size:13px; }
   td, th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--line); }
   td:first-child, th:first-child { text-align:left; }
-  tr.best td { background:rgba(230,180,34,.15); }
-  .result { font-size:16px; font-weight:700; color:#ffb74d; margin-top:6px; }
+  tr.best td { background:#fdf3d6; }
+  .result { font-size:16px; font-weight:700; color:#c0392b; margin-top:6px; }
   .actions { display:flex; gap:8px; flex-wrap:wrap; }
-  .advice { font-size:13px; margin-top:6px; padding:6px 8px; background:#1a1c21; border-radius:6px; }
+  .advice { font-size:13px; margin-top:6px; padding:6px 8px; background:#eef1f5; border-radius:6px; }
 </style>
 </head>
 <body>
 <header>
+  <span class="nav"><a href="/">首页</a><a href="/docs/">教程</a></span>
   <label>seed <input id="seed" type="number" value="0"></label>
   <label>模式 <select id="mode"><option value="god">上帝视角</option><option value="player">玩家视角</option></select></label>
   <label>座位 <select id="seat"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
@@ -189,7 +193,7 @@ function renderAside(st){
     const top = a.nn[0];
     html += `<div class="panel"><h3>神经网络：玩家${a.player} 打哪张？</h3>`;
     html += a.nn.map(r=>`<div class="bar ${r===top?"chosen":""}">${tile(r.tile,"sm")}<div class="track"><div class="fill" style="width:${(r.p*100).toFixed(1)}%"></div></div><span class="pct">${(r.p*100).toFixed(1)}%</span></div>`).join("");
-    if (a.rule) { const rb=a.rule.find(r=>r.tile===a.rule_pick)||a.rule[0]; html += `<div class="advice">建议：网络 <b>${tileInfo(top.tile).txt}</b>（${(top.p*100).toFixed(0)}%） · 规则 <b>${tileInfo(rb.tile).txt}</b>（${rb.shanten} 向听 / ${rb.effective} 进张）${top.tile===rb.tile?" · 一致":" · <span style='color:#ffb74d'>不一致</span>"}</div>`; }
+    if (a.rule) { const rb=a.rule.find(r=>r.tile===a.rule_pick)||a.rule[0]; html += `<div class="advice">建议：网络 <b>${tileInfo(top.tile).txt}</b>（${(top.p*100).toFixed(0)}%） · 规则 <b>${tileInfo(rb.tile).txt}</b>（${rb.shanten} 向听 / ${rb.effective} 进张）${top.tile===rb.tile?" · 一致":" · <span style='color:#c0392b'>不一致</span>"}</div>`; }
     html += `</div>`;
   }
   if (a && a.rule){

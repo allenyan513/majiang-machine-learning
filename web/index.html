@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>麻将机器学习</title>
+<style>
+  :root { --bg:#f6f8fa; --card:#ffffff; --fg:#1f2328; --muted:#656d76; --line:#d7dce2; --accent:#1f5fa8; --accent-soft:#eaf1fa; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+  a { color:var(--accent); text-decoration:none; }
+  main { max-width:900px; margin:0 auto; padding:64px 24px 80px; }
+  h1 { font-size:34px; margin:0 0 8px; letter-spacing:.01em; }
+  .sub { color:var(--muted); font-size:17px; margin:0 0 40px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:18px; }
+  .card { display:block; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:22px 22px 20px; color:inherit;
+          transition:box-shadow .15s, transform .15s; }
+  .card:hover { box-shadow:0 6px 24px rgba(31,95,168,.12); transform:translateY(-2px); text-decoration:none; }
+  .card .icon { font-size:28px; margin-bottom:8px; }
+  .card h2 { font-size:18px; margin:0 0 6px; }
+  .card p { margin:0; color:var(--muted); font-size:14px; line-height:1.6; }
+  .card .go { display:inline-block; margin-top:12px; color:var(--accent); font-size:14px; }
+  .status { margin-top:44px; padding:18px 22px; background:var(--accent-soft); border-radius:12px; font-size:14px; }
+  .status b { color:var(--accent); }
+  .status ol { margin:8px 0 0; padding-left:20px; }
+  footer { margin-top:40px; color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>麻将机器学习</h1>
+  <p class="sub">从零写一个麻将引擎，教一个 AI 打牌，再让它自己变强。代码、教程、可以上手玩的游戏，都在这里。</p>
+
+  <div class="cards">
+    <a class="card" href="/docs/">
+      <div class="icon">📖</div>
+      <h2>教程</h2>
+      <p>15 章，跟着仓库的真实代码走：引擎 → 规则 bot → 监督学习 → PPO → 评估，以及两次诚实的失败。</p>
+      <span class="go">开始阅读 →</span>
+    </a>
+    <a class="card" href="/play/">
+      <div class="icon">🀄</div>
+      <h2>游戏</h2>
+      <p>观战四个 AI 对局，或者自己坐下打。每一步都能看到神经网络给每张牌的打出概率和规则分析。</p>
+      <span class="go">进入牌桌 →</span>
+    </a>
+    <a class="card" href="https://github.com/allenyan513/majiang-machine-learning">
+      <div class="icon">⌥</div>
+      <h2>代码</h2>
+      <p>Python，不到 3000 行，无 RL 框架。引擎、agent、特征、训练、评估、这个网站，全部开源。</p>
+      <span class="go">GitHub →</span>
+    </a>
+  </div>
+
+  <div class="status">
+    <b>项目进度</b>
+    <ol>
+      <li>引擎（简化推倒胡）、规则 bot、监督学习、PPO 微调 —— 完成，流水线跑通</li>
+      <li>改进老师 —— 做了，没用；发现是计分规则让防守不值钱（<a href="/docs/#13-defense">第 13 章</a>）</li>
+      <li>转向日本立直麻将 —— 规则研究完成（<a href="/docs/#14-riichi-rules">第 14 章</a>），引擎重写进行中</li>
+    </ol>
+  </div>
+
+  <footer>本站由一个 Python 标准库 http.server 提供：教程是静态页面，游戏后台跑着引擎和模型。</footer>
+</main>
+</body>
+</html>

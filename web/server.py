@@ -4,7 +4,7 @@
     然后打开 http://localhost:8000
 
 路由：
-    /            -> 跳转 /docs/
+    /            首页（web/index.html）
     /docs/       教程阅读器（web/docs/）
     /play/       单机游戏 / 观战（web/play/）
     /api/...     引擎 + 模型
@@ -193,12 +193,7 @@ def make_handler(session: Session):
                 view = int(q["view"][0]) if "view" in q and q["view"][0] != "" else None
                 with session.lock:
                     return self._json(session.state(view))
-            if u.path == "/":
-                self.send_response(302)
-                self.send_header("Location", "/docs/")
-                self.end_headers()
-                return
-            return super().do_GET()  # /docs/ 和 /play/ 由目录 index.html 提供
+            return super().do_GET()  # /、/docs/、/play/ 都由各自目录的 index.html 提供
 
         def do_POST(self):
             u = urlparse(self.path)
