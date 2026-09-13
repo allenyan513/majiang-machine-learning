@@ -9,14 +9,14 @@ import torch
 from majiang.engine.actions import Action, ActionType
 from majiang.engine.game import Observation, Phase
 from majiang.ml.features import encode
-from majiang.ml.model import DiscardNet, load
+from majiang.ml.model import ActorCritic, DiscardNet, load
 
 from .base import Agent
 from .rule_agent import RuleAgent
 
 
 class NNAgent(Agent):
-    def __init__(self, model: DiscardNet | str, temperature: float = 0.0, seed: int | None = None):
+    def __init__(self, model: DiscardNet | ActorCritic | str, temperature: float = 0.0, seed: int | None = None):
         self.model = load(model) if isinstance(model, str) else model
         self.model.eval()
         self.temperature = temperature  # 0 = 取最大概率；>0 = 按概率采样（RL 需要）

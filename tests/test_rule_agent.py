@@ -43,3 +43,24 @@ def test_rule_agent_beats_random_and_never_illegal():
     s = rep["stats"]
     assert s["rule"]["wins"] / s["rule"]["games"] > 0.5
     assert rep["draws"] / rep["n"] < 0.5
+
+
+def test_addkan_with_four_melds_does_not_crash():
+    """4 组副露后摸到碰过的牌的第 4 张 -> 可加杠。曾因副露数算成 5 而崩溃。"""
+    from majiang.engine.actions import ActionType as AT
+    from majiang.engine.actions import Action
+    from majiang.engine.hand import Meld, MeldType
+
+    melds = [Meld(MeldType.PON, t, 1) for t in (0, 9, 18, 27)]
+    obs = _obs("1m 白", [Action(AT.ADDKAN, 0), Action(AT.DISCARD, 0), Action(AT.DISCARD, 33)], melds=melds)
+    a = RuleAgent().act(obs)
+    assert a in obs.legal_actions
+
+
+def test_shanten_rejects_bad_meld_count():
+    import pytest
+
+    from majiang.engine.shanten import shanten
+
+    with pytest.raises(ValueError):
+        shanten([0] * 34, num_melds=5)
