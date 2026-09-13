@@ -19,8 +19,20 @@ AGENT_FACTORIES = {
     "rule": lambda seed: RuleAgent(),
 }
 
+_MODEL_CACHE: dict[str, object] = {}
+
 
 def make_agent(name: str, seed: int) -> Agent:
+    """支持 'random' / 'rule' / 'nn:models/discard.pt'。"""
+    if name.startswith("nn:"):
+        from majiang.agents.nn_agent import NNAgent
+
+        path = name[3:]
+        if path not in _MODEL_CACHE:
+            from majiang.ml.model import load
+
+            _MODEL_CACHE[path] = load(path)
+        return NNAgent(_MODEL_CACHE[path], seed=seed)  # type: ignore[arg-type]
     return AGENT_FACTORIES[name](seed)
 
 
