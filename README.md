@@ -6,12 +6,12 @@
 
 ## 教程
 
-配套写了一份 15 章的教程，讲怎么从零把这个项目写出来（引擎 → 规则 bot → 监督学习 → PPO → 评估 → 改进老师 → 转向日麻）：[docs/](docs/README.md)。
+配套写了一份 15 章的教程，讲怎么从零把这个项目写出来（引擎 → 规则 bot → 监督学习 → PPO → 评估 → 改进老师 → 转向日麻）：[web/docs/](web/docs/README.md)。
 
 在 GitHub 上可以直接读 Markdown；想要带目录导航的网页版：
 
 ```bash
-python3 -m http.server 8080 --directory docs   # 打开 http://localhost:8080/
+uv run python -m web.server   # 教程 http://localhost:8000/docs/  游戏 /play/
 ```
 
 ## 安装
@@ -55,7 +55,7 @@ uv run python -m majiang.ml.compare --candidates rule,nn:models/discard.pt,nn:mo
 ## 可视化
 
 ```bash
-uv run python -m majiang.viz.server --model models/discard.pt --agents nn,nn,rule,rule
+uv run python -m web.server --model models/discard.pt --agents nn,nn,rule,rule
 ```
 
 打开 http://localhost:8000 ，牌桌布局仿 QQ 麻将：中间是剩余牌数和风位，四家的牌河摆在各自面前，副露放手牌旁边。两种模式：
@@ -69,5 +69,5 @@ uv run python -m majiang.viz.server --model models/discard.pt --agents nn,nn,rul
 majiang/engine/   tile 牌编码 · win 胡牌判定 · shanten 向听数 · game 状态机
 majiang/agents/   random · rule（牌效率+防守）· nn（打牌用网络，碰杠胡用规则）
 majiang/ml/       features 特征编码 · generate 多进程生成数据 · model 1D-CNN + ActorCritic · train 监督 · rl PPO · plot 曲线
-majiang/viz/      本地观战网页
+web/              server 统一服务 · docs 教程 · play 单机游戏（一个镜像部署）
 ```

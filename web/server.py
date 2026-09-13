@@ -1,7 +1,15 @@
-"""对局可视化服务器（标准库，无额外依赖）。
+"""网站服务器（标准库，无额外依赖）：教程 + 单机游戏 + AI 分析 API，一个进程全包。
 
-    uv run python -m majiang.viz.server --model models/discard.pt --agents nn,nn,rule,rule
+    uv run python -m web.server --model models/discard.pt --agents nn,nn,rule,rule
     然后打开 http://localhost:8000
+
+路由：
+    /            -> 跳转 /docs/
+    /docs/       教程阅读器（web/docs/）
+    /play/       单机游戏 / 观战（web/play/）
+    /api/...     引擎 + 模型
+
+部署：监听地址和端口可用 --host/--port 或环境变量 HOST/PORT 指定（Cloud Run 注入 PORT）。
 
 API（都返回 JSON）：
     POST /api/new?seed=N&human=P   新开一局；human=P 表示座位 P 由人操作（-1 = 全 AI）
@@ -30,7 +38,7 @@ from majiang.engine.shanten import discard_options, shanten
 from majiang.engine.tile import to_str
 from majiang.ml.model import load
 
-STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class Session:
@@ -46,7 +54,9 @@ class Session:
     def _make(self, name: str, seed: int) -> Agent:
         if name == "nn":
             if self.model is None:
-                raise SystemExit("--agents 里有 nn 但没有可用的模型文件，请先训练或用 --model 指定")
+                print("警告：没有模型文件，nn 座位降级为 rule（先训练或用 --model 指定）")
+                self.agent_names[seed] = "rule"
+                return RuleAgent()
             return NNAgent(self.model, seed=seed)
         if name == "rule":
             return RuleAgent()
@@ -163,7 +173,7 @@ class Session:
 def make_handler(session: Session):
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *a, **kw):
-            super().__init__(*a, directory=STATIC_DIR, **kw)
+            super().__init__(*a, directory=WEB_DIR, **kw)
 
         def log_message(self, *a):  # 安静
             pass
@@ -184,8 +194,11 @@ def make_handler(session: Session):
                 with session.lock:
                     return self._json(session.state(view))
             if u.path == "/":
-                self.path = "/index.html"
-            return super().do_GET()
+                self.send_response(302)
+                self.send_header("Location", "/docs/")
+                self.end_headers()
+                return
+            return super().do_GET()  # /docs/ 和 /play/ 由目录 index.html 提供
 
         def do_POST(self):
             u = urlparse(self.path)
@@ -214,12 +227,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="models/discard.pt")
     ap.add_argument("--agents", default="nn,nn,rule,rule")
-    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     args = ap.parse_args()
     session = Session(args.agents.split(","), args.model)
     session.new(0)
-    srv = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(session))
-    print(f"打开 http://localhost:{args.port}   agents={args.agents}  model={'有' if session.model else '无'}")
+    srv = ThreadingHTTPServer((args.host, args.port), make_handler(session))
+    print(f"教程 http://localhost:{args.port}/docs/   游戏 http://localhost:{args.port}/play/   "
+          f"agents={','.join(session.agent_names)}  model={'有' if session.model else '无'}", flush=True)
     srv.serve_forever()
 
 

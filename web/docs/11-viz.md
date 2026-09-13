@@ -1,11 +1,11 @@
 # 第 11 章 可视化与人机对战
 
-> 对应代码：`majiang/viz/server.py`、`majiang/viz/index.html`、`tests/test_viz_session.py`
+> 对应代码：`web/server.py`、`web/play/index.html`、`tests/test_viz_session.py`
 
 训练出来的模型是一个 2.4 MB 的二进制文件和一串指标。想知道它到底学会了什么，最有效的办法是**看它打牌**——而且要能看到它每一步在想什么。
 
 ```bash
-uv run python -m majiang.viz.server --model models/discard.pt --agents nn,nn,rule,rule
+uv run python -m web.server --model models/discard.pt --agents nn,nn,rule,rule
 # 打开 http://localhost:8000
 ```
 
