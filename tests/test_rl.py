@@ -49,7 +49,7 @@ def test_masked_keeps_finite_and_actor_critic_roundtrip(tmp_path):
 def test_nn_agent_accepts_actor_critic():
     agent = NNAgent(ActorCritic(DiscardNet(8, 2)), seed=0)
     r = play_game([agent, RuleAgent(), RuleAgent(), RuleAgent()], seed=4)
-    assert sum(r.scores) == 0
+    assert sum(r.deltas) <= 0
 
 
 def test_rl_smoke(tmp_path):

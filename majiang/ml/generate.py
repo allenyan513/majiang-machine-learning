@@ -5,7 +5,7 @@
 输出 npz：
     x: uint8[N, 308]  紧凑特征（见 features.py）
     y: uint8[N]       打出的牌 0–33
-只记录 DISCARD 阶段且最终动作是打牌的决策（自摸/杠不记）。
+只记录 DISCARD 阶段的打牌决策（含立直宣言打的那张；自摸/杠不记）。
 """
 
 import argparse
@@ -31,7 +31,7 @@ class Recorder(Agent):
 
     def act(self, obs: Observation) -> Action:
         a = self.inner.act(obs)
-        if obs.phase == Phase.DISCARD and a.type == ActionType.DISCARD:
+        if obs.phase == Phase.DISCARD and a.type in (ActionType.DISCARD, ActionType.RIICHI):
             self.xs.append(encode_compact(obs))
             self.ys.append(a.tile)
         return a

@@ -24,7 +24,7 @@ def _worker(args: tuple[str, str, list[int]]) -> np.ndarray:
         seat = s % 4
         agents: list[Agent] = [make_agent(name, s) if p == seat else make_agent(opponent, s * 4 + p) for p in range(4)]
         r = play_game(agents, seed=s, dealer=(s // 4) % 4)
-        out[i] = (r.scores[seat], r.winner == seat, r.loser == seat)
+        out[i] = (r.deltas[seat] / 1000, any(w.player == seat for w in r.wins), any(w.from_player == seat for w in r.wins))
     return out
 
 
@@ -50,7 +50,7 @@ def report(results: dict[str, np.ndarray], opponent: str = "rule") -> None:
     base = names[0]
     n = len(results[base])
     print(f"{n} 局配对评估（每个候选坐同一座位 vs 3 个 {opponent}）\n")
-    print(f"{'candidate':28} {'均分':>8} {'胜率':>7} {'放炮':>7}   {'vs ' + base:>20}")
+    print(f"{'candidate':28} {'均分(千点)':>8} {'胜率':>7} {'放炮':>7}   {'vs ' + base:>20}")
     for nm in names:
         r = results[nm]
         line = f"{nm:28} {r[:, 0].mean():+8.3f} {r[:, 1].mean():7.1%} {r[:, 2].mean():7.1%}"

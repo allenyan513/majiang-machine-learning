@@ -7,7 +7,7 @@ from .base import Agent
 
 
 class RandomAgent(Agent):
-    """随机打牌。唯一的"智能"：能胡就胡——否则一局几乎永远打不完。"""
+    """随机打牌。唯一的"智能"：能和就和——否则一局几乎永远打不完。"""
 
     def __init__(self, seed: int | None = None):
         self.rng = random.Random(seed)
