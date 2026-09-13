@@ -41,7 +41,17 @@ def test_seven_pairs():
     assert shanten(c("11m 22m 33s 44s 55p 66p 东")) == 0         # 七对听
     assert shanten(c("11m 22m 33s 44s 55p 66p 东东")) == -1      # 七对胡
     assert shanten(c("11m 22m 33s 44s 55p 6p 东南")) == 1
-    assert seven_pairs_shanten(c("1111m 22m 33s 44s 55p 东")) == 0  # 四张算两对
+    assert seven_pairs_shanten(c("1111m 22m 33s 44s 55p 东")) == 2  # 日麻：四张只算一对，多出的两张 1m 是死牌
+
+
+def test_kokushi_shanten():
+    from majiang.engine.shanten import kokushi_shanten
+
+    assert kokushi_shanten(c("19m 19s 19p 东南西北白发中")) == 0      # 十三面
+    assert kokushi_shanten(c("19m 19s 19p 东南西北白发 中中")) == -1   # 和
+    assert kokushi_shanten(c("19m 19s 19p 东南西北白 发发 2m")) == 0   # 14 张，打 2m 听中
+    assert kokushi_shanten(c("2345678m 2345678s")) == 13              # 一张幺九都没有
+    assert shanten(c("19m 19s 19p 东南西北白发 中中")) == -1
 
 
 def test_effective_tiles():
