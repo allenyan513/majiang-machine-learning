@@ -92,7 +92,7 @@ uv run pytest -q # 43 个测试应该全过
 majiang/engine/   tile 牌编码 · win 胡牌判定 · shanten 向听数 · game 状态机
 majiang/agents/   random · rule（牌效率+防守）· defense 校准式危险度 · nn（网络打牌，碰杠胡用规则）
 majiang/ml/       features 特征 · generate 造数据 · model 网络 · train 监督 · rl PPO · compare 评估 · calibrate_defense 校准
-majiang/viz/      本地观战网页（人机对战）
+web/              server 统一服务 · docs 教程 · play 单机游戏
 tests/            43 个测试，每章都会用到
 ```
 

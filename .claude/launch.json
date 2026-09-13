@@ -2,13 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "viz",
+      "name": "web",
       "runtimeExecutable": "uv",
       "runtimeArgs": [
         "run",
         "python",
         "-m",
-        "majiang.viz.server",
+        "web.server",
         "--model",
         "models/discard.pt",
         "--agents",
@@ -17,18 +17,6 @@
         "8000"
       ],
       "port": 8000
-    },
-    {
-      "name": "docs",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8080",
-        "--directory",
-        "docs"
-      ],
-      "port": 8080
     }
   ]
 }

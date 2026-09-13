@@ -9,11 +9,11 @@
 **本地网页版**（有目录导航、代码高亮、键盘左右键翻页）：
 
 ```bash
-python3 -m http.server 8080 --directory docs
-# 打开 http://localhost:8080/
+uv run python -m web.server
+# 打开 http://localhost:8000/docs/   （游戏在 /play/）
 ```
 
-网页版不依赖任何外部资源，离线可用。需要起一个静态服务器是因为浏览器不允许 `file://` 页面读取同目录的 Markdown。
+网页版不依赖任何外部资源，离线可用。需要起一个服务器是因为浏览器不允许 `file://` 页面读取同目录的 Markdown。
 
 ## 目录
 

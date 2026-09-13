@@ -1,4 +1,4 @@
-from majiang.viz.server import Session
+from web.server import Session
 
 
 def test_god_view_and_stepping():
