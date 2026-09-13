@@ -9,10 +9,8 @@
         "python",
         "-m",
         "web.server",
-        "--model",
-        "models/discard.pt",
         "--agents",
-        "nn,nn,rule,rule",
+        "rule,rule,rule,rule",
         "--port",
         "8000"
       ],
