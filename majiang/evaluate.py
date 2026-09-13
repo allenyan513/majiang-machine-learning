@@ -17,6 +17,7 @@ from majiang.run import play_game
 AGENT_FACTORIES = {
     "random": lambda seed: RandomAgent(seed=seed),
     "rule": lambda seed: RuleAgent(),
+    "rule_v1": lambda seed: RuleAgent(defense="v1"),
 }
 
 _MODEL_CACHE: dict[str, object] = {}
@@ -37,7 +38,7 @@ def make_agent(name: str, seed: int) -> Agent:
 
 
 def evaluate(names: list[str], n: int, base_seed: int = 0) -> dict:
-    stats: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0, "tsumo": 0, "deal_in": 0, "riichi": 0, "score": 0})
+    stats: dict[str, dict] = defaultdict(lambda: {"games": 0, "wins": 0, "tsumo": 0, "deal_in": 0, "score": 0})
     draws = 0
     t0 = time.time()
     for g in range(n):
@@ -45,18 +46,16 @@ def evaluate(names: list[str], n: int, base_seed: int = 0) -> dict:
         seat_names = names[shift:] + names[:shift]  # 轮转座位
         agents = [make_agent(nm, base_seed + g * 4 + i) for i, nm in enumerate(seat_names)]
         r = play_game(agents, seed=base_seed + g, dealer=g % 4)
-        if r.kind != "win":
+        if r.winner is None:
             draws += 1
-        winners = {w.player: w for w in r.wins}
-        losers = {w.from_player for w in r.wins if w.from_player is not None}
         for seat, nm in enumerate(seat_names):
             s = stats[nm]
             s["games"] += 1
-            s["score"] += r.deltas[seat]
-            if seat in winners:
+            s["score"] += r.scores[seat]
+            if r.winner == seat:
                 s["wins"] += 1
-                s["tsumo"] += winners[seat].from_player is None
-            if seat in losers:
+                s["tsumo"] += r.is_tsumo
+            if r.loser == seat:
                 s["deal_in"] += 1
     dt = time.time() - t0
     return {"stats": dict(stats), "draws": draws, "n": n, "seconds": dt}
@@ -65,12 +64,12 @@ def evaluate(names: list[str], n: int, base_seed: int = 0) -> dict:
 def print_report(rep: dict) -> None:
     n = rep["n"]
     print(f"{n} 局，用时 {rep['seconds']:.1f}s，流局 {rep['draws']} ({rep['draws'] / n:.1%})")
-    print(f"{'agent':8} {'局数':>6} {'和率':>7} {'自摸率':>7} {'放炮率':>7} {'均分(点)':>9}")
+    print(f"{'agent':8} {'局数':>6} {'胜率':>7} {'自摸率':>7} {'放炮率':>7} {'均分':>7}")
     for nm, s in rep["stats"].items():
         g = s["games"]
         print(
             f"{nm:8} {g:6d} {s['wins'] / g:7.1%} {s['tsumo'] / g:7.1%} "
-            f"{s['deal_in'] / g:7.1%} {s['score'] / g:+9.0f}"
+            f"{s['deal_in'] / g:7.1%} {s['score'] / g:+7.3f}"
         )
 
 

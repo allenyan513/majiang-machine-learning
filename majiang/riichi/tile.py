@@ -1,14 +1,16 @@
-"""牌的编码。
+"""牌的编码（日本立直麻将）。
 
-全局约定：一张牌用 0–33 的整数表示（称为 tile id / t34）。
+全局约定：一种牌用 0–33 的整数表示（tile id / t34）。
 
     0–8   万 1m–9m
-    9–17  条 1s–9s
+    9–17  索 1s–9s
     18–26 筒 1p–9p
-    27–33 字 东 南 西 北 中 发 白
+    27–33 字 东 南 西 北 白 发 中
 
-手牌不用列表存对象，而是长度 34 的计数数组 counts[t] = 该牌张数。
-这样胡牌判定/向听数是纯数组运算，之后也能直接喂给神经网络。
+手牌用长度 34 的计数数组 counts[t] = 该牌张数。
+
+赤宝牌（红 5）：5m/5s/5p 各有一张是红色的。它的 tile id 和普通 5 相同，
+只在 Hand.reds / 牌河标记里单独记一位——所有牌型算法都不需要区分它，只有算番时 +1。
 """
 
 NUM_TILE_TYPES = 34
@@ -16,11 +18,19 @@ TILES_PER_TYPE = 4
 TOTAL_TILES = NUM_TILE_TYPES * TILES_PER_TYPE  # 136
 
 SUIT_SIZE = 9
-HONOR_START = 27  # 字牌起始 id
+HONOR_START = 27
+
+# 字牌
+EAST, SOUTH, WEST, NORTH, WHITE, GREEN, RED = 27, 28, 29, 30, 31, 32, 33
+WINDS = (EAST, SOUTH, WEST, NORTH)
+DRAGONS = (WHITE, GREEN, RED)
+
+# 赤宝牌：每花色的 5
+RED_FIVES = (4, 13, 22)
 
 _SUIT_CHARS = "msp"
-_HONOR_NAMES = ["东", "南", "西", "北", "中", "发", "白"]
-_SUIT_NAMES = ["万", "条", "筒"]
+_HONOR_NAMES = ["东", "南", "西", "北", "白", "发", "中"]
+_SUIT_NAMES = ["万", "索", "筒"]
 
 
 def is_honor(t: int) -> bool:
@@ -28,7 +38,7 @@ def is_honor(t: int) -> bool:
 
 
 def suit(t: int) -> int:
-    """0=万 1=条 2=筒 3=字。"""
+    """0=万 1=索 2=筒 3=字。"""
     return t // SUIT_SIZE if t < HONOR_START else 3
 
 
@@ -38,8 +48,28 @@ def number(t: int) -> int:
 
 
 def is_terminal(t: int) -> bool:
-    """幺九牌（1 或 9 的数牌）。"""
+    """幺九数牌（1 或 9）。"""
     return not is_honor(t) and number(t) in (1, 9)
+
+
+def is_yaochu(t: int) -> bool:
+    """幺九牌：1、9 或字牌。"""
+    return is_honor(t) or is_terminal(t)
+
+
+def is_simple(t: int) -> bool:
+    """中张（2–8）。"""
+    return not is_yaochu(t)
+
+
+def dora_from_indicator(t: int) -> int:
+    """宝牌指示牌 -> 宝牌：数牌 +1（9 绕回 1），风 东南西北 循环，三元 白发中 循环。"""
+    if t < HONOR_START:
+        base = suit(t) * SUIT_SIZE
+        return base + (t - base + 1) % SUIT_SIZE
+    if t in WINDS:
+        return WINDS[(WINDS.index(t) + 1) % 4]
+    return DRAGONS[(DRAGONS.index(t) + 1) % 3]
 
 
 def to_str(t: int) -> str:
@@ -50,14 +80,12 @@ def to_str(t: int) -> str:
 
 
 def to_cn(t: int) -> str:
-    """中文：一万 五条 九筒 东。"""
     if is_honor(t):
         return _HONOR_NAMES[t - HONOR_START]
     return "一二三四五六七八九"[number(t) - 1] + _SUIT_NAMES[suit(t)]
 
 
 def from_str(s: str) -> int:
-    """解析单张牌：'1m' / '东'。"""
     s = s.strip()
     if s in _HONOR_NAMES:
         return HONOR_START + _HONOR_NAMES.index(s)
@@ -69,12 +97,7 @@ def from_str(s: str) -> int:
 
 
 def parse_hand(s: str) -> list[int]:
-    """解析简写手牌为 tile id 列表。
-
-    支持两种写法，可混用（空格分隔）：
-        '123m 456s 789p 东东'   -> 数字后跟花色；字牌直接写
-        '1m 2m 3m'
-    """
+    """解析简写手牌为 tile id 列表：'123m 456s 789p 东东' 或 '1m 2m 3m'，可混用。"""
     tiles: list[int] = []
     for token in s.split():
         if token in _HONOR_NAMES:
@@ -92,7 +115,6 @@ def parse_hand(s: str) -> list[int]:
 
 
 def hand_to_str(tiles: list[int]) -> str:
-    """把 tile 列表压成简写：'123m 456s 东东'。"""
     tiles = sorted(tiles)
     parts: list[str] = []
     for s_idx in range(3):

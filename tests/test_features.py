@@ -25,9 +25,7 @@ def test_shapes_and_unseen_consistency():
 def test_relative_perspective():
     g = Game(seed=5)
     g.start()
-    from majiang.engine.game import Discard
-
-    g.rivers[1] = [Discard(3), Discard(3)]  # 玩家1 打过两张 4m
+    g.rivers[1] = [3, 3]  # 玩家1 打过两张 4m
     obs0 = g.observe(0)
     obs2 = g.observe(2)
     c0, c2 = encode_compact(obs0), encode_compact(obs2)

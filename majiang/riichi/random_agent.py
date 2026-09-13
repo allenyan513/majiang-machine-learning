@@ -1,13 +1,13 @@
 import random
 
-from majiang.engine.actions import Action, ActionType
-from majiang.engine.game import Observation
+from majiang.riichi.actions import Action, ActionType
+from majiang.riichi.game import Observation
 
-from .base import Agent
+from majiang.agents.base import Agent
 
 
 class RandomAgent(Agent):
-    """随机打牌。唯一的"智能"：能胡就胡——否则一局几乎永远打不完。"""
+    """随机打牌。唯一的"智能"：能和就和——否则一局几乎永远打不完。"""
 
     def __init__(self, seed: int | None = None):
         self.rng = random.Random(seed)

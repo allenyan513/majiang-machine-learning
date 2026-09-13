@@ -14,4 +14,4 @@ COPY models ./models
 
 ENV HOST=0.0.0.0 PORT=8000
 EXPOSE 8000
-CMD ["python", "-m", "web.server", "--agents", "rule,rule,rule,rule"]
+CMD ["python", "-m", "web.server", "--model", "models/discard.pt", "--agents", "nn,nn,rule,rule"]

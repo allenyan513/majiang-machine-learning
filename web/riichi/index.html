@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>麻将 AI 对局</title>
+<style>
+  :root { --bg:#f6f8fa; --panel:#ffffff; --line:#d7dce2; --txt:#1f2328; --muted:#656d76; --accent:#1f5fa8;
+          --m:#c0392b; --s:#1e8449; --p:#1f5fa8; --z:#222; --felt:#8a2432; --felt2:#6a1a26; --gold:#e6b422; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 -apple-system,"PingFang SC",sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; gap:10px; align-items:center; padding:8px 14px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header label { color:var(--muted); font-size:13px; }
+  header input, header select { background:#fff; color:var(--txt); border:1px solid var(--line); border-radius:4px; padding:3px 6px; }
+  header input[type=number] { width:64px; }
+  header .nav { display:flex; gap:10px; margin-right:6px; font-size:13px; }
+  header .nav a { color:var(--accent); text-decoration:none; }
+  button { padding:5px 12px; border:1px solid #c9ced6; background:#fff; color:var(--txt); border-radius:4px; cursor:pointer; }
+  button:hover { background:#eef1f5; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { background:#b03a2e; border-color:#b03a2e; color:#fff; }
+  button.big { font-size:15px; padding:8px 16px; }
+  button.active { outline:2px solid var(--gold); }
+  #status { margin-left:auto; color:var(--muted); }
+  main { display:grid; grid-template-columns: 800px minmax(320px,1fr); gap:16px; padding:12px; align-items:start; }
+
+  /* ---------- 牌桌 ---------- */
+  .table { position:relative; width:800px; height:720px; border-radius:18px; padding:8px;
+           background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt2) 100%);
+           box-shadow: inset 0 0 0 6px #3b1a10, inset 0 0 0 9px #8a5a2b, 0 8px 30px rgba(0,0,0,.5);
+           display:grid; grid-template-columns:165px 1fr 165px; grid-template-rows:170px 1fr 150px;
+           grid-template-areas: "left top right" "left center right" "bottom bottom bottom"; }
+  .seat { position:relative; display:flex; }
+  .seat.top { grid-area:top; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:34px; gap:6px; }
+  .seat.bottom { grid-area:bottom; flex-direction:column; align-items:center; justify-content:flex-end; padding-bottom:8px; gap:6px; }
+  .seat.bottom .river { grid-template-columns:repeat(12, 26px); }
+  .seat.left { grid-area:left; flex-direction:row; align-items:center; justify-content:flex-start; gap:8px; padding-left:6px; }
+  .seat.right { grid-area:right; flex-direction:row-reverse; align-items:center; justify-content:flex-start; gap:8px; padding-right:6px; }
+  .center { grid-area:center; display:flex; align-items:center; justify-content:center; }
+  .hub { width:230px; height:190px; border-radius:12px; background:#fffaf0; border:3px solid var(--gold);
+         display:grid; grid-template-columns:34px 1fr 34px; grid-template-rows:30px 1fr 30px; place-items:center; color:#333; }
+  .hub .mid { text-align:center; }
+  .hub .round { font-size:20px; font-weight:800; }
+  .hub .wall { font-size:13px; color:#555; margin-top:2px; }
+  .hub .sticks { font-size:12px; color:#777; }
+  .hub .dora { display:flex; gap:2px; justify-content:center; margin-top:6px; }
+  .hub .wind { font-size:16px; font-weight:700; color:#bbb; }
+  .hub .wind.on { color:#c0392b; }
+
+  .plate { position:absolute; display:flex; gap:6px; align-items:center; font-size:12px; color:#f1e7d3; white-space:nowrap;
+           background:rgba(0,0,0,.35); padding:2px 8px; border-radius:10px; z-index:2; }
+  .seat.bottom .plate { left:14px; top:6px; }
+  .seat.top .plate { left:14px; top:4px; }
+  .seat.left .plate, .seat.right .plate { top:8px; flex-direction:column; align-items:flex-start; gap:0; }
+  .seat.left .plate { left:8px; }
+  .seat.right .plate { right:8px; }
+  .plate b { font-size:13px; }
+  .plate .score { font-size:13px; font-weight:700; color:#fff; }
+  .plate .tag { font-size:10px; padding:0 5px; border-radius:3px; background:#444; }
+  .plate .tag.nn { background:#1f5fa8; } .plate .tag.rule { background:#1e8449; } .plate .tag.human { background:#b7791f; } .plate .tag.random { background:#666; }
+  .plate .tag.dealer { background:#b03a2e; }
+  .plate .tag.riichi { background:#e6b422; color:#222; font-weight:700; }
+  .seat.active .plate { box-shadow:0 0 0 2px var(--gold); }
+
+  .tiles { display:flex; gap:2px; flex-wrap:wrap; align-items:flex-end; }
+  .tiles.col { flex-direction:column; flex-wrap:nowrap; align-items:center; }
+  .tile { position:relative; display:inline-flex; align-items:center; justify-content:center; width:30px; height:42px; border-radius:4px;
+          background:linear-gradient(#fffdf7,#efe9dc); border:1px solid #b9b2a3; border-bottom:4px solid #2e8b57; font-weight:700; font-size:14px; }
+  .tile.sm { width:22px; height:31px; border-bottom-width:3px; font-size:11px; }
+  .tile.m { color:var(--m); } .tile.s { color:var(--s); } .tile.p { color:var(--p); } .tile.z { color:var(--z); }
+  .tile.red { background:linear-gradient(#ffe9e6,#f6c9c2); border-color:#d98c80; }
+  .tile.red::after { content:""; position:absolute; top:2px; right:2px; width:5px; height:5px; border-radius:50%; background:#e0261c; }
+  .tile.back { background:linear-gradient(#2f9e5b,#1f7a43); border-color:#145a32; border-bottom-color:#0e3d22; }
+  .tile.draw { margin-left:10px; }
+  .tile.hl { outline:3px solid #ff5252; outline-offset:-1px; }
+  .tile.rot { transform:rotate(90deg); margin:0 6px; }
+  .tile.claimed { opacity:.35; }
+  .tile.dora { box-shadow:0 0 0 2px var(--gold); }
+  .tile.click { cursor:pointer; transition:transform .08s; }
+  .tile.click:hover { transform:translateY(-6px); }
+  .tile.dim { opacity:.45; }
+  .meld { display:flex; gap:1px; padding:2px 4px; background:rgba(0,0,0,.25); border-radius:4px; align-items:flex-end; }
+  .melds { display:flex; gap:6px; }
+  .melds.col { flex-direction:column; }
+  .river { display:grid; grid-template-columns:repeat(6, 26px); gap:2px; min-height:33px; }
+  .river.col { grid-template-columns:none; grid-template-rows:repeat(6, 33px); grid-auto-flow:column; grid-auto-columns:26px; min-height:0; min-width:26px; }
+  .handrow { display:flex; align-items:flex-end; gap:8px; }
+  .handrow.col { flex-direction:column; align-items:center; }
+
+  /* ---------- 右侧面板 ---------- */
+  aside { display:grid; gap:12px; align-content:start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .panel h3 { margin:0 0 8px; font-size:14px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .bar { display:grid; grid-template-columns:28px 1fr 52px; gap:8px; align-items:center; margin:3px 0; }
+  .bar .track { height:16px; background:#eef1f5; border-radius:3px; overflow:hidden; }
+  .bar .fill { height:100%; background:#3498db; }
+  .bar.chosen .fill { background:#e74c3c; }
+  .bar .pct { text-align:right; font-variant-numeric:tabular-nums; font-size:13px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--line); }
+  td:first-child, th:first-child { text-align:left; }
+  tr.best td { background:#fdf3d6; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .advice { font-size:13px; margin-top:6px; padding:6px 8px; background:#eef1f5; border-radius:6px; }
+  .result h3 { color:#c0392b; }
+  .yaku { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .yaku span { background:#fdf3d6; border:1px solid #e6b422; border-radius:4px; padding:1px 8px; font-size:13px; }
+  .deltas { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:8px; text-align:center; font-size:13px; }
+  .deltas .pos { color:#1e8449; font-weight:700; } .deltas .neg { color:#c0392b; font-weight:700; }
+  .rank { font-size:14px; } .rank b { font-size:16px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="nav"><b>日本立直麻将</b>（独立保留的引擎）</span>
+  <label>seed <input id="seed" type="number" value="0"></label>
+  <label>长度 <select id="length"><option value="hanchan">半庄</option><option value="tonpuu">东风战</option></select></label>
+  <label>模式 <select id="mode"><option value="player">玩家视角</option><option value="god">上帝视角</option></select></label>
+  <label>座位 <select id="seat"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+  <label><input id="human" type="checkbox" checked> 我来打</label>
+  <button id="new" class="primary">新的一场</button>
+  <button id="rand">随机</button>
+  <button id="step">下一步</button>
+  <button id="step10">快进 10 步</button>
+  <button id="auto">自动播放</button>
+  <button id="end">跳到本局结束</button>
+  <span id="status"></span>
+</header>
+<main>
+  <div class="table" id="table"></div>
+  <aside id="aside"></aside>
+</main>
+<script>
+const HONORS = ["东","南","西","北","白","发","中"];
+const ui = { mode:"player", seat:0, human:true, auto:null, st:null, riichiMode:false };
+
+function tileInfo(t){ if(t>=27) return {txt:HONORS[t-27], cls:"z"}; const n=t%9+1, k=Math.floor(t/9); return {txt:n+"万索筒"[k], cls:"msp"[k]}; }
+function tile(t, cls="", red=false){
+  if(t<0) return `<span class="tile back ${cls}"></span>`;
+  const i=tileInfo(t); const dora = ui.st && ui.st.dora.includes(t) ? " dora" : "";
+  return `<span class="tile ${i.cls} ${cls}${red?" red":""}${dora}" data-t="${t}">${i.txt}</span>`;
+}
+function tiles(arr, cls="", col=false, reds=[]){
+  // reds: 该玩家持有赤牌的种类；同种牌只把第一张画成赤
+  const used = new Set();
+  return `<span class="tiles ${col?"col":""}">${arr.map(t=>{ const r = reds.includes(t) && !used.has(t); if(r) used.add(t); return tile(t,cls,r); }).join("")}</span>`;
+}
+const viewParam = () => ui.mode==="player" ? `view=${ui.seat}` : "view=";
+const api = async (path, method="GET") => (await fetch(path + (path.includes("?")?"&":"?") + viewParam(), {method})).json();
+
+function seatHtml(st, p, pos){
+  const pl = st.players[p];
+  const active = st.to_act.includes(p);
+  const hidden = pl.hand.length===0 && pl.hand_size>0;
+  const isDrawTurn = st.phase==="DISCARD" && st.current===p && st.last_draw>=0;
+  const myTurn = st.waiting_human && st.human===p && st.phase==="DISCARD";
+  const side = pos==="left" || pos==="right";
+  const big = pos==="bottom";
+  const tcls = big ? "" : "sm";
+  const a = st.analysis;
+  const riichiTiles = new Set(myTurn && a ? a.legal.filter(x=>x.type==="RIICHI").map(x=>x.tile) : []);
+  const discardTiles = new Set(myTurn && a ? a.legal.filter(x=>x.type==="DISCARD").map(x=>x.tile) : []);
+
+  let hand = hidden ? Array(pl.hand_size).fill(-1) : [...pl.hand];
+  let drawHtml = "";
+  let drawRed = false;
+  if (isDrawTurn && !hidden){ const k=hand.indexOf(st.last_draw); if(k>=0) hand.splice(k,1); drawRed = pl.reds.includes(st.last_draw) && !hand.includes(st.last_draw); }
+  else if (isDrawTurn && hidden){ hand.pop(); }
+  const clickCls = (t)=>{
+    if(!myTurn) return "";
+    const ok = ui.riichiMode ? riichiTiles.has(t) : discardTiles.has(t);
+    return ok ? " click" : " dim";
+  };
+  const used = new Set();
+  const handHtml = `<span class="tiles ${side?"col":""}">${hand.map(t=>{ const r = t>=0 && pl.reds.includes(t) && !used.has(t); if(r) used.add(t); return tile(t, tcls+clickCls(t), r); }).join("")}</span>`;
+  if (isDrawTurn) drawHtml = tile(hidden?-1:st.last_draw, tcls+" draw"+(hidden?"":clickCls(st.last_draw)), drawRed);
+  const melds = pl.melds.map(m=>`<span class="meld">${m.tiles.map((t,i)=>tile(t,"sm"+(t===m.called&&i===m.tiles.indexOf(m.called)&&m.type!=="ANKAN"?" rot":""), m.reds>0&&i===0)).join("")}</span>`).join("");
+  const meldsHtml = melds ? `<span class="melds ${side?"col":""}">${melds}</span>` : "";
+  const river = pl.river.map((d,k)=>{
+    const last = st.phase==="RESPOND" && st.current===p && k===pl.river.length-1 && !st.chankan;
+    return tile(d.tile, "sm"+(d.riichi?" rot":"")+(d.claimed?" claimed":"")+(last?" hl":""), d.red);
+  }).join("");
+  const riverHtml = `<span class="river ${side?"col":""}">${river}</span>`;
+  const sh = pl.shanten==null ? "" : pl.shanten<0 ? "和" : pl.shanten===0 ? "听牌" : pl.shanten+"向听";
+  const plate = `<span class="plate"><span><b>${pl.wind}</b> 玩家${p} <span class="tag ${pl.agent}">${pl.agent}</span>
+     ${st.dealer===p?'<span class="tag dealer">庄</span>':""} ${pl.riichi?'<span class="tag riichi">立直</span>':""}</span>
+     <span><span class="score">${pl.score}</span> <span class="muted">${sh}${active?" · 决策中":""}</span></span></span>`;
+  let body;
+  if (pos==="bottom") body = `${riverHtml}<span class="handrow">${handHtml}${drawHtml}${meldsHtml}</span>`;
+  else if (pos==="top") body = `<span class="handrow">${handHtml}${drawHtml}${meldsHtml}</span>${riverHtml}`;
+  else body = `<span class="handrow col">${handHtml}${drawHtml}${meldsHtml}</span>${riverHtml}`;
+  return `<div class="seat ${pos} ${active?"active":""}" data-p="${p}">${plate}${body}</div>`;
+}
+
+function renderTable(st){
+  const el = document.getElementById("table");
+  const bottom = ui.seat;
+  const pos = ["bottom","right","top","left"];
+  let html = "";
+  for (let rel=0; rel<4; rel++){ const p=(bottom+rel)%4; html += seatHtml(st, p, pos[rel]); }
+  const cur = st.finished ? -1 : st.to_act[0];
+  const windAt = (rel)=>{ const p=(bottom+rel)%4; return `<span class="wind ${cur===p?"on":""}">${st.players[p].wind}</span>`; };
+  const last = st.last_action ? `玩家${st.last_action.player} ${({DISCARD:"打",RIICHI:"立直 打",CHI:"吃",PON:"碰",KAN:"杠",ANKAN:"暗杠",ADDKAN:"加杠",RON:"荣和",TSUMO:"自摸",PASS:"过"})[st.last_action.type]||st.last_action.type}${st.last_action.tile>=0&&st.last_action.type!=="PASS"?" "+tileInfo(st.last_action.tile).txt:""}` : "开局";
+  html += `<div class="center"><div class="hub">
+     <span></span>${windAt(2)}<span></span>
+     ${windAt(3)}<div class="mid"><div class="round">${st.round_label}${st.honba?` ${st.honba}本场`:""}</div>
+       <div class="wall">余 ${st.wall} 张 · 立直棒 ${st.riichi_sticks}</div>
+       <div class="dora">${st.dora_indicators.map(t=>tile(t,"sm")).join("")}</div>
+       <div class="sticks">${last}</div></div>${windAt(1)}
+     <span></span>${windAt(0)}<span></span></div></div>`;
+  el.innerHTML = html;
+  if (st.waiting_human && st.phase==="DISCARD"){
+    el.querySelectorAll(`.seat[data-p="${st.human}"] .tile.click`).forEach(t => t.onclick = ()=> act(ui.riichiMode ? "RIICHI" : "DISCARD", +t.dataset.t));
+  }
+}
+
+const NAMES = {TSUMO:"自摸",RON:"荣和",PON:"碰",KAN:"明杠",ANKAN:"暗杠",ADDKAN:"加杠",PASS:"过",CHI:"吃"};
+function renderAside(st){
+  const el = document.getElementById("aside");
+  const a = st.analysis;
+  let html = "";
+  if (st.result){
+    const r = st.result;
+    html += `<div class="panel result"><h3>${r.kind==="win" ? "和了" : r.kind==="draw" ? "荒牌流局" : "途中流局 · "+r.reason}</h3>`;
+    for (const w of r.wins){
+      html += `<div><b>玩家${w.player}</b> ${w.from==null?"自摸":"荣和 玩家"+w.from} ${tile(w.tile,"sm")} · ${w.limit?w.limit+" ":""}${w.han}番${w.fu}符 · ${w.base>=8000?"":""}</div>`;
+      html += `<div style="margin:6px 0">${tiles(w.hand,"sm")} ${w.melds.map(m=>`<span class="meld">${tiles(m.tiles,"sm")}</span>`).join("")}</div>`;
+      html += `<div class="yaku">${w.yaku.map(([n,h])=>`<span>${n} ${h}</span>`).join("")}</div>`;
+    }
+    if (r.ura_indicators.length) html += `<div class="muted">里宝牌指示 ${tiles(r.ura_indicators,"sm")}</div>`;
+    if (r.kind==="draw") html += `<div class="muted">听牌：${r.tenpai.map((t,i)=>t?"玩家"+i:null).filter(Boolean).join("、")||"无"}</div>`;
+    html += `<div class="deltas">${r.deltas.map((d,i)=>`<div>玩家${i}<br><span class="${d>0?"pos":d<0?"neg":""}">${d>0?"+":""}${d}</span></div>`).join("")}</div>`;
+    if (st.match.ended){
+      html += `<h3 style="margin-top:10px">终局 · ${st.match.end_reason}</h3><div class="rank">` +
+        st.match.ranking.map(x=>`<div><b>${x.rank}.</b> 玩家${x.player} ${x.points} <span class="muted">(${x.final>0?"+":""}${x.final.toFixed(1)})</span></div>`).join("") + `</div>`;
+      html += `<div class="actions"><button class="primary big" onclick="newGame()">再来一场</button></div>`;
+    } else {
+      html += `<div class="actions"><button class="primary big" id="next">下一局</button></div>`;
+    }
+    html += `</div>`;
+  }
+  if (st.waiting_human && a){
+    html += `<div class="panel"><h3>轮到你（玩家${st.human}）</h3>`;
+    if (a.phase==="DISCARD"){
+      const hasRiichi = a.legal.some(x=>x.type==="RIICHI");
+      html += `<div class="muted">${ui.riichiMode ? "选择立直时打出的牌（高亮的可选）" : "点击手牌打出"}${a.furiten?" · <b style='color:#c0392b'>振听</b>":""}</div>`;
+      html += `<div class="actions">`;
+      if (hasRiichi) html += `<button class="primary ${ui.riichiMode?"active":""}" onclick="toggleRiichi()">立直</button>`;
+      for (const x of a.legal.filter(x=>["TSUMO","ANKAN","ADDKAN"].includes(x.type)))
+        html += `<button class="danger" onclick="act('${x.type}',${x.tile})">${NAMES[x.type]} ${tileInfo(x.tile).txt}</button>`;
+      html += `</div>`;
+    } else {
+      html += `<div class="muted">对 ${tileInfo(st.chankan ? a.legal[0].tile : st.last_discard).txt} 的响应${st.chankan?"（抢杠）":""}</div><div class="actions">`;
+      for (const x of a.legal){
+        if (x.type==="CHI") html += `<button onclick="act('CHI',${x.tile},${x.extra})">吃 ${[0,1,2].map(i=>tileInfo(x.extra+i).txt).join("")}</button>`;
+        else if (x.type==="PASS") html += `<button onclick="act('PASS',-1)">过</button>`;
+        else html += `<button class="${x.type==="RON"?"danger":""}" onclick="act('${x.type}',${x.tile})">${NAMES[x.type]}</button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  if (a && a.waits && a.waits.length){
+    html += `<div class="panel"><h3>听牌</h3>${tiles(a.waits,"sm")}${a.furiten?' <span style="color:#c0392b">振听</span>':""}</div>`;
+  }
+  if (a && a.nn){
+    const top = a.nn[0];
+    html += `<div class="panel"><h3>神经网络：玩家${a.player} 打哪张？</h3>`;
+    html += a.nn.map(r=>`<div class="bar ${r===top?"chosen":""}">${tile(r.tile,"sm")}<div class="track"><div class="fill" style="width:${(r.p*100).toFixed(1)}%"></div></div><span class="pct">${(r.p*100).toFixed(1)}%</span></div>`).join("");
+    html += `</div>`;
+  }
+  if (a && a.rule){
+    const rp = a.rule_pick;
+    html += `<div class="panel"><h3>规则分析（向听 / 进张）</h3><div class="muted">当前 ${a.shanten<0?"已和":a.shanten+" 向听"} · 规则 bot 会：${rp.type==="RIICHI"?"立直 打":rp.type==="DISCARD"?"打":NAMES[rp.type]||rp.type} ${rp.tile>=0?tileInfo(rp.tile).txt:""}</div><table><tr><th>打</th><th>向听</th><th>进张</th></tr>`;
+    html += a.rule.slice(0,8).map(r=>`<tr class="${r.tile===rp.tile?"best":""}"><td>${tile(r.tile,"sm")}</td><td>${r.shanten}</td><td>${r.effective}</td></tr>`).join("");
+    html += `</table></div>`;
+  }
+  if (a && a.phase==="RESPOND" && !st.waiting_human){
+    html += `<div class="panel"><h3>响应：玩家${a.player}</h3>可选：${a.legal.map(x=>NAMES[x.type]||x.type).join(" / ")}</div>`;
+  }
+  if (!html) html = `<div class="panel muted">${st.finished?"本局结束":"AI 正在行动…"}</div>`;
+  el.innerHTML = html;
+  const nb = document.getElementById("next"); if (nb) nb.onclick = async()=> render(await api("/api/next","POST"));
+}
+
+function render(st){
+  ui.st = st;
+  if(!st.started){ document.getElementById("status").textContent="未开局"; return; }
+  if (!(st.waiting_human && st.phase==="DISCARD")) ui.riichiMode = false;
+  renderTable(st); renderAside(st);
+  document.getElementById("status").textContent = st.finished ? (st.match.ended ? "一场结束" : "本局结束") : st.waiting_human ? "等你出牌" : `轮到玩家${st.to_act[0]}`;
+  if (st.finished && ui.auto) toggleAuto();
+}
+
+async function act(type, tile, extra=-1){ ui.riichiMode=false; render(await api(`/api/act?player=${ui.seat}&type=${type}&tile=${tile}&extra=${extra}`, "POST")); }
+function toggleRiichi(){ ui.riichiMode = !ui.riichiMode; render(ui.st); }
+function readControls(){ ui.mode=document.getElementById("mode").value; ui.seat=+document.getElementById("seat").value; ui.human=document.getElementById("human").checked && ui.mode==="player"; }
+function toggleAuto(){
+  const b = document.getElementById("auto");
+  if (ui.auto){ clearInterval(ui.auto); ui.auto=null; b.textContent="自动播放"; return; }
+  b.textContent="停止"; ui.auto = setInterval(async()=>{ const st=await api("/api/step","POST"); render(st); }, 650);
+}
+async function newGame(){ readControls(); render(await api(`/api/new?seed=${document.getElementById("seed").value}&human=${ui.human?ui.seat:-1}&length=${document.getElementById("length").value}`,"POST")); }
+
+document.getElementById("new").onclick = newGame;
+document.getElementById("rand").onclick = ()=>{ document.getElementById("seed").value = Math.floor(Math.random()*1e6); newGame(); };
+document.getElementById("step").onclick = async()=> render(await api("/api/step","POST"));
+document.getElementById("step10").onclick = async()=> render(await api("/api/step?n=10","POST"));
+document.getElementById("end").onclick = async()=> render(await api("/api/step?n=1000","POST"));
+document.getElementById("auto").onclick = toggleAuto;
+for (const id of ["mode","seat"]) document.getElementById(id).onchange = async()=>{ readControls(); render(await api("/api/state")); };
+readControls(); api("/api/state").then(render);
+</script>
+</body>
+</html>

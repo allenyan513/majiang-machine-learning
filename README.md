@@ -2,9 +2,9 @@
 
 一个用来学习的项目：先写麻将引擎，再写规则 bot，再用监督学习训练神经网络模仿它，最后（阶段 4）用强化学习超越它。
 
-规则：**日本立直麻将**（天凤四人规则）——役、番符计分、立直、振听、吃碰杠、宝牌/赤牌、半庄。
-规则研究与实现范围见 [web/docs/14-riichi-rules.md](web/docs/14-riichi-rules.md)。
-（阶段 1–5 用的是简化推倒胡；教程前 13 章仍按旧规则写，正在改写。）
+规则：简化推倒胡（万条筒字 136 张，碰/杠/胡，无吃无花无番型）——教程主线刻意保持规则简单，把注意力留给机器学习。
+
+另有一套完整的日本立直麻将引擎（役、番符计分、立直、振听、半庄）独立保留在 `majiang/riichi/`，附一个单机牌桌：`uv run python -m majiang.riichi.server --port 8001`。它不在教程主线上，规则研究见 [第 14 章](web/docs/14-riichi-rules.md)。
 
 ## 教程
 
@@ -27,7 +27,6 @@ uv run pytest -q
 
 ```bash
 uv run python -m majiang.cli --seed 7                 # 看 4 个随机 bot 打一局
-uv run python -m majiang.evaluate --agents rule,rule,rule,rule --n 200
 uv run python -m majiang.evaluate --agents rule,random,random,random --n 500
 ```
 
@@ -58,10 +57,10 @@ uv run python -m majiang.ml.compare --candidates rule,nn:models/discard.pt,nn:mo
 ## 可视化
 
 ```bash
-uv run python -m web.server                           # 全规则 bot；训练后可加 --model models/discard.pt --agents nn,nn,rule,rule
+uv run python -m web.server --model models/discard.pt --agents nn,nn,rule,rule
 ```
 
-打开 http://localhost:8000/play/ ，可以打一场半庄或东风战。两种模式：
+打开 http://localhost:8000 ，牌桌布局仿 QQ 麻将：中间是剩余牌数和风位，四家的牌河摆在各自面前，副露放手牌旁边。两种模式：
 
 - **上帝视角**：四家手牌全可见，轮到谁决策就显示谁的分析（神经网络的每张牌打出概率 + 规则 bot 的向听/进张表）。适合看 AI 之间对战。
 - **玩家视角**：选一个座位坐下，其他三家的牌盖着。勾上"我来打"后由你操作这个座位——轮到你时点手牌打出、按钮碰/杠/胡/过，右侧的分析面板就是给你的"预测器"。
@@ -69,8 +68,9 @@ uv run python -m web.server                           # 全规则 bot；训练�
 ## 代码地图
 
 ```
-majiang/engine/   tile 牌编码 · win 拆分/和牌判定 · shanten 向听数 · yaku 役与符 · score 点数 · game 单局状态机 · match 半庄
-majiang/agents/   random · rule（门清速攻：听牌立直、按向听打牌）· nn（打牌用网络，其余用规则）
+majiang/engine/   tile 牌编码 · win 胡牌判定 · shanten 向听数 · game 状态机（简化规则，教程主线）
+majiang/riichi/   日本立直麻将引擎 + agent + 独立牌桌服务器（保留，不在主线）
+majiang/agents/   random · rule（牌效率+防守）· nn（打牌用网络，碰杠胡用规则）
 majiang/ml/       features 特征编码 · generate 多进程生成数据 · model 1D-CNN + ActorCritic · train 监督 · rl PPO · plot 曲线
 web/              server 统一服务 · docs 教程 · play 单机游戏（一个镜像部署）
 ```
