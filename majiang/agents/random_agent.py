@@ -1,0 +1,19 @@
+import random
+
+from majiang.engine.actions import Action, ActionType
+from majiang.engine.game import Observation
+
+from .base import Agent
+
+
+class RandomAgent(Agent):
+    """随机打牌。唯一的"智能"：能胡就胡——否则一局几乎永远打不完。"""
+
+    def __init__(self, seed: int | None = None):
+        self.rng = random.Random(seed)
+
+    def act(self, obs: Observation) -> Action:
+        for a in obs.legal_actions:
+            if a.type in (ActionType.TSUMO, ActionType.RON):
+                return a
+        return self.rng.choice(obs.legal_actions)
