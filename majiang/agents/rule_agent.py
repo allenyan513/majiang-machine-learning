@@ -56,11 +56,12 @@ class RuleAgent(Agent):
         options = discard_options(hand, n_melds, visible)
         best_shanten = options[0][1]
 
-        for kt, k in ((ActionType.ANKAN, 4), (ActionType.ADDKAN, 1)):
+        # 暗杠：手里 4 张变成一组新副露；加杠：碰变杠，副露数不变
+        for kt, k, dm in ((ActionType.ANKAN, 4, 1), (ActionType.ADDKAN, 1, 0)):
             if kt in by_type:
                 t = by_type[kt].tile
                 after = self._with(hand, t, -k)
-                if shanten(after, n_melds + 1) <= best_shanten:
+                if shanten(after, n_melds + dm) <= best_shanten:
                     return by_type[kt]
 
         danger = self._danger_map(obs)

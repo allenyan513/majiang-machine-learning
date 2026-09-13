@@ -85,6 +85,8 @@ def _suit_combos_cached(seg: tuple[int, ...], allow_sequence: bool) -> tuple[tup
 def standard_shanten(counts: list[int], num_melds: int = 0) -> int:
     """标准型向听数。num_melds = 已副露的面子数（碰/杠）。"""
     need = 4 - num_melds  # 手牌还需要凑出几个面子
+    if not 0 <= need <= 4:
+        raise ValueError(f"副露数不合法: {num_melds}")
     groups = [
         _suit_combos_cached(tuple(counts[0:9]), True),
         _suit_combos_cached(tuple(counts[9:18]), True),

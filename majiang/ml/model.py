@@ -37,14 +37,44 @@ class DiscardNet(nn.Module):
         return torch.softmax(self.mask_logits(self(x), x), dim=-1)
 
 
-def save(model: DiscardNet, path: str) -> None:
-    torch.save({"state": model.state_dict(), "channels": model.conv[0].out_channels,
-                "blocks": (len(model.conv) + 1) // 2}, path)
+class ActorCritic(nn.Module):
+    """阶段 4 用：在 DiscardNet 的卷积干上加一个价值头（critic）。
+
+    policy 直接复用监督学习的权重；value_head 从零开始，估计"当前局面最终能得几分"。
+    对外接口和 DiscardNet 一样有 probs()，所以 NNAgent / 可视化不用改。
+    """
+
+    def __init__(self, policy: DiscardNet):
+        super().__init__()
+        self.policy = policy
+        ch = policy.conv[0].out_channels
+        self.value_head = nn.Sequential(nn.Flatten(), nn.Linear(ch * 34, 128), nn.ReLU(), nn.Linear(128, 1))
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """返回 (未 mask 的 logits, value)。"""
+        h = self.policy.conv(x)
+        return self.policy.head(h), self.value_head(h).squeeze(-1)
+
+    def probs(self, x: torch.Tensor) -> torch.Tensor:
+        logits, _ = self(x)
+        return torch.softmax(DiscardNet.mask_logits(logits, x), dim=-1)
 
 
-def load(path: str) -> DiscardNet:
+def _arch(policy: DiscardNet) -> dict:
+    return {"channels": policy.conv[0].out_channels, "blocks": (len(policy.conv) + 1) // 2}
+
+
+def save(model: DiscardNet | ActorCritic, path: str) -> None:
+    if isinstance(model, ActorCritic):
+        torch.save({"kind": "ac", "state": model.state_dict(), **_arch(model.policy)}, path)
+    else:
+        torch.save({"kind": "policy", "state": model.state_dict(), **_arch(model)}, path)
+
+
+def load(path: str) -> DiscardNet | ActorCritic:
     ck = torch.load(path, map_location="cpu")
-    m = DiscardNet(ck["channels"], ck["blocks"])
+    policy = DiscardNet(ck["channels"], ck["blocks"])
+    m: DiscardNet | ActorCritic = ActorCritic(policy) if ck.get("kind") == "ac" else policy
     m.load_state_dict(ck["state"])
     m.eval()
     return m
