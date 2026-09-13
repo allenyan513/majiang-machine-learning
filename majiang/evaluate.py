@@ -17,6 +17,7 @@ from majiang.run import play_game
 AGENT_FACTORIES = {
     "random": lambda seed: RandomAgent(seed=seed),
     "rule": lambda seed: RuleAgent(),
+    "rule_v1": lambda seed: RuleAgent(defense="v1"),
 }
 
 _MODEL_CACHE: dict[str, object] = {}
