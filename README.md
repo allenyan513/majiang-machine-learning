@@ -34,7 +34,10 @@ uv run python -m majiang.evaluate --agents nn:models/discard.pt,rule,rule,rule -
 uv run python -m majiang.viz.server --model models/discard.pt --agents nn,nn,rule,rule
 ```
 
-打开 http://localhost:8000 ：四家手牌/牌河全可见，轮到谁打牌时右侧显示神经网络对每张牌的打出概率，以及规则 bot 的向听/进张分析。
+打开 http://localhost:8000 ，牌桌布局仿 QQ 麻将：中间是剩余牌数和风位，四家的牌河摆在各自面前，副露放手牌旁边。两种模式：
+
+- **上帝视角**：四家手牌全可见，轮到谁决策就显示谁的分析（神经网络的每张牌打出概率 + 规则 bot 的向听/进张表）。适合看 AI 之间对战。
+- **玩家视角**：选一个座位坐下，其他三家的牌盖着。勾上"我来打"后由你操作这个座位——轮到你时点手牌打出、按钮碰/杠/胡/过，右侧的分析面板就是给你的"预测器"。
 
 ## 代码地图
 
