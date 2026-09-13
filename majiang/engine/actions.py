@@ -9,30 +9,43 @@ from enum import Enum, auto
 
 class ActionType(Enum):
     DISCARD = auto()   # 打出一张牌
-    PON = auto()       # 碰（别人打出的牌）
-    KAN = auto()       # 明杠（别人打出的牌，手里有 3 张）
-    ANKAN = auto()     # 暗杠（自己摸到第 4 张）
-    ADDKAN = auto()    # 加杠（碰过的刻子摸到第 4 张）
-    RON = auto()       # 点炮胡（胡别人打出的牌）
-    TSUMO = auto()     # 自摸胡
+    RIICHI = auto()    # 立直宣言并打出 tile
+    CHI = auto()       # 吃上家打的 tile，组成 extra 起始的顺子
+    PON = auto()
+    KAN = auto()       # 大明杠
+    ANKAN = auto()     # 暗杠
+    ADDKAN = auto()    # 加杠
+    RON = auto()       # 荣和（含抢杠）
+    TSUMO = auto()     # 自摸
     PASS = auto()      # 放弃响应
 
 
 @dataclass(frozen=True)
 class Action:
     type: ActionType
-    tile: int = -1  # 打出/碰/杠/胡的那张牌；PASS 时为 -1
+    tile: int = -1   # 打出 / 吃碰杠的那张 / 和的那张；PASS 为 -1
+    extra: int = -1  # CHI：顺子起始牌
 
     def __repr__(self) -> str:
         from .tile import to_str
 
         if self.tile < 0:
             return self.type.name
+        if self.type == ActionType.CHI:
+            return f"CHI({to_str(self.tile)} in {''.join(to_str(self.extra + i) for i in range(3))})"
         return f"{self.type.name}({to_str(self.tile)})"
 
 
 def discard(t: int) -> Action:
     return Action(ActionType.DISCARD, t)
+
+
+def riichi(t: int) -> Action:
+    return Action(ActionType.RIICHI, t)
+
+
+def chi(t: int, start: int) -> Action:
+    return Action(ActionType.CHI, t, start)
 
 
 def pon(t: int) -> Action:
@@ -66,5 +79,6 @@ PRIORITY = {
     ActionType.RON: 3,
     ActionType.KAN: 2,
     ActionType.PON: 2,
+    ActionType.CHI: 1,
     ActionType.PASS: 0,
 }

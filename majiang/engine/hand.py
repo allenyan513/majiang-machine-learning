@@ -20,6 +20,7 @@ class Meld:
     tile: int                # 碰/杠：那张牌；吃：顺子的起始牌
     from_player: int = -1    # 牌来自谁；暗杠为 -1
     called: int = -1         # 吃/碰/明杠时拿的那张牌（用于显示横放）；暗杠为 -1
+    reds: int = 0            # 这组里有几张赤牌（算宝牌用）
 
     @property
     def is_open(self) -> bool:

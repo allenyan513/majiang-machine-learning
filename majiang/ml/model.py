@@ -28,13 +28,15 @@ class DiscardNet(nn.Module):
         return self.head(self.conv(x))
 
     @staticmethod
-    def mask_logits(logits: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """手里没有的牌不能打：平面 0 是 hand>=1。"""
-        in_hand = x[:, 0] > 0
-        return logits.masked_fill(~in_hand, float("-inf"))
+    def mask_logits(logits: torch.Tensor, x: torch.Tensor, legal: torch.Tensor | None = None) -> torch.Tensor:
+        """不能打的牌设为 -inf。默认用"手里有"（平面 0）；传 legal（[34] 或 [B,34] bool）则用它。"""
+        mask = (x[:, 0] > 0) if legal is None else legal.to(logits.device)
+        if mask.dim() == 1:
+            mask = mask.unsqueeze(0).expand_as(logits)
+        return logits.masked_fill(~mask, float("-inf"))
 
-    def probs(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.softmax(self.mask_logits(self(x), x), dim=-1)
+    def probs(self, x: torch.Tensor, legal: torch.Tensor | None = None) -> torch.Tensor:
+        return torch.softmax(self.mask_logits(self(x), x, legal), dim=-1)
 
 
 class ActorCritic(nn.Module):
@@ -55,9 +57,9 @@ class ActorCritic(nn.Module):
         h = self.policy.conv(x)
         return self.policy.head(h), self.value_head(h).squeeze(-1)
 
-    def probs(self, x: torch.Tensor) -> torch.Tensor:
+    def probs(self, x: torch.Tensor, legal: torch.Tensor | None = None) -> torch.Tensor:
         logits, _ = self(x)
-        return torch.softmax(DiscardNet.mask_logits(logits, x), dim=-1)
+        return torch.softmax(DiscardNet.mask_logits(logits, x, legal), dim=-1)
 
 
 def _arch(policy: DiscardNet) -> dict:

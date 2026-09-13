@@ -1,7 +1,7 @@
-"""神经网络 agent：打牌由模型决定，碰/杠/胡沿用 RuleAgent 的逻辑。
+"""神经网络 agent：打牌由模型决定，其余决策（和、立直、杠、吃碰）沿用 RuleAgent。
 
-这种"混合"是刻意的：阶段 3 只训练了打牌决策（数据里最多、最有意思的部分），
-响应动作数据少且规则逻辑已经够好。阶段 4 RL 再把它们一起学。
+"混合"是刻意的：阶段 3 只训练了"打哪张"（数据里最多、最有意思的部分）。
+立直/吃碰/杠的决策数据少且规则逻辑够用，以后再一起学。
 """
 
 import torch
@@ -15,6 +15,15 @@ from .base import Agent
 from .rule_agent import RuleAgent
 
 
+def legal_discard_mask(obs: Observation) -> torch.Tensor:
+    """34 维 bool：哪些牌现在可以打（立直后只能摸切、食替禁止都体现在 legal_actions 里）。"""
+    m = torch.zeros(34, dtype=torch.bool)
+    for a in obs.legal_actions:
+        if a.type == ActionType.DISCARD:
+            m[a.tile] = True
+    return m
+
+
 class NNAgent(Agent):
     def __init__(self, model: DiscardNet | ActorCritic | str, temperature: float = 0.0, seed: int | None = None):
         self.model = load(model) if isinstance(model, str) else model
@@ -24,19 +33,18 @@ class NNAgent(Agent):
         self.gen = torch.Generator().manual_seed(seed or 0)
 
     def discard_probs(self, obs: Observation) -> torch.Tensor:
-        """34 维概率，不在手里的牌为 0。可视化直接用它。"""
+        """34 维概率，不能打的牌为 0。可视化直接用它。"""
         with torch.no_grad():
-            return self.model.probs(encode(obs))[0]
+            return self.model.probs(encode(obs), legal_discard_mask(obs))[0]
 
     def act(self, obs: Observation) -> Action:
-        by_type = {a.type: a for a in obs.legal_actions}
-        # 胡牌、响应阶段、杠：交给规则
-        if obs.phase != Phase.DISCARD or ActionType.TSUMO in by_type:
-            return self.rule.act(obs)
         rule_action = self.rule.act(obs)
-        if rule_action.type in (ActionType.ANKAN, ActionType.ADDKAN):
+        # 非打牌决策（和、立直、杠、响应）交给规则；只有普通打牌用网络
+        if obs.phase != Phase.DISCARD or rule_action.type != ActionType.DISCARD:
             return rule_action
-
+        legal = [a for a in obs.legal_actions if a.type == ActionType.DISCARD]
+        if len(legal) == 1:
+            return legal[0]
         probs = self.discard_probs(obs)
         if self.temperature <= 0:
             t = int(probs.argmax())
