@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viz",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "majiang.viz.server", "--model", "models/discard.pt", "--agents", "nn,nn,rule,rule", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

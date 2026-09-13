@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>麻将 AI 观战</title>
+<style>
+  :root { --bg:#f4f1ea; --card:#fff; --line:#ddd; --m:#c0392b; --s:#27ae60; --p:#2980b9; --z:#333; }
+  body { margin:0; font:14px/1.4 -apple-system, "PingFang SC", sans-serif; background:var(--bg); color:#222; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header input { width:70px; }
+  button { padding:5px 12px; border:1px solid #bbb; background:#fafafa; border-radius:4px; cursor:pointer; }
+  button:hover { background:#eee; }
+  #status { margin-left:auto; color:#666; }
+  main { display:grid; grid-template-columns: 1fr 380px; gap:16px; padding:16px; }
+  .players { display:grid; gap:10px; }
+  .player { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .player.active { border-color:#e67e22; box-shadow:0 0 0 2px #f5cba7; }
+  .player .title { display:flex; gap:10px; align-items:baseline; margin-bottom:6px; }
+  .player .title b { font-size:15px; }
+  .tag { font-size:11px; padding:1px 6px; border-radius:3px; background:#eee; color:#555; }
+  .tag.nn { background:#d6eaf8; color:#1b4f72; } .tag.rule { background:#d5f5e3; color:#145a32; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:3px 0; }
+  .row .label { width:34px; color:#888; font-size:12px; }
+  .tiles { display:flex; gap:3px; flex-wrap:wrap; }
+  .tile { display:inline-flex; align-items:center; justify-content:center; width:26px; height:36px; border:1px solid #bbb; border-radius:3px; background:#fffdf7; font-weight:600; font-size:13px; box-shadow:0 1px 0 #ccc; }
+  .tile.m { color:var(--m); } .tile.s { color:var(--s); } .tile.p { color:var(--p); } .tile.z { color:var(--z); }
+  .tile.small { width:20px; height:28px; font-size:11px; }
+  .tile.draw { border-color:#e67e22; margin-left:8px; }
+  .tile.hl { outline:2px solid #e74c3c; }
+  .meld { display:flex; gap:2px; padding:2px 4px; background:#f0f0f0; border-radius:4px; margin-right:6px; }
+  aside { display:grid; gap:12px; align-content:start; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .panel h3 { margin:0 0 8px; font-size:14px; }
+  .bar { display:grid; grid-template-columns: 30px 1fr 52px; gap:8px; align-items:center; margin:3px 0; }
+  .bar .track { height:18px; background:#eee; border-radius:3px; overflow:hidden; }
+  .bar .fill { height:100%; background:#3498db; }
+  .bar.chosen .fill { background:#e74c3c; }
+  .bar .pct { text-align:right; font-variant-numeric: tabular-nums; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { padding:2px 6px; text-align:right; border-bottom:1px solid #eee; }
+  td:first-child, th:first-child { text-align:left; }
+  tr.best td { background:#fdf2e9; }
+  .result { font-size:16px; font-weight:600; color:#c0392b; }
+  .muted { color:#888; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <label>seed <input id="seed" type="number" value="0"></label>
+  <button id="new">新局</button>
+  <button id="step">下一步</button>
+  <button id="step10">快进 10 步</button>
+  <button id="auto">自动播放</button>
+  <button id="end">跳到结束</button>
+  <span id="status"></span>
+</header>
+<main>
+  <div class="players" id="players"></div>
+  <aside id="aside"></aside>
+</main>
+<script>
+const HONORS = ["东","南","西","北","中","发","白"];
+function tileInfo(t){ if(t>=27) return {txt:HONORS[t-27], cls:"z"}; const n=t%9+1, s="msp"[Math.floor(t/9)]; return {txt:n+"万条筒"["msp".indexOf(s)], cls:s}; }
+function tile(t, extra=""){ const i=tileInfo(t); return `<span class="tile ${i.cls} ${extra}">${i.txt}</span>`; }
+function tiles(arr, extra=""){ return `<span class="tiles">${arr.map(t=>tile(t,extra)).join("")}</span>`; }
+
+let auto = null;
+const api = async (path, method="GET") => (await fetch(path,{method})).json();
+
+function renderPlayers(st){
+  const el = document.getElementById("players");
+  el.innerHTML = st.players.map((pl,i)=>{
+    const active = st.to_act.includes(i);
+    const hand = [...pl.hand];
+    let drawHtml = "";
+    if (st.phase==="DISCARD" && st.current===i && st.last_draw>=0){
+      const k = hand.indexOf(st.last_draw); if(k>=0) hand.splice(k,1);
+      drawHtml = tile(st.last_draw,"draw");
+    }
+    const melds = pl.melds.map(m=>`<span class="meld">${tiles(Array(m.type==="PON"?3:4).fill(m.tile),"small")}</span>`).join("");
+    const river = pl.river.map((t,k)=>tile(t,"small"+(st.phase==="RESPOND"&&st.current===i&&k===pl.river.length-1?" hl":""))).join("");
+    const shanten = pl.shanten<0?"胡":pl.shanten===0?"听牌":pl.shanten+"向听";
+    return `<div class="player ${active?"active":""}">
+      <div class="title"><b>玩家${i}</b> <span class="tag ${pl.agent}">${pl.agent}</span>
+        ${st.dealer===i?'<span class="tag">庄</span>':""} <span class="muted">${shanten}</span>
+        ${active?'<span class="muted">← 决策中</span>':""}</div>
+      <div class="row"><span class="label">手牌</span>${tiles(hand)}${drawHtml}${melds?'<span class="label">副露</span>'+melds:""}</div>
+      <div class="row"><span class="label">牌河</span><span class="tiles">${river||'<span class="muted">—</span>'}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function renderAside(st){
+  const el = document.getElementById("aside");
+  let html = `<div class="panel"><h3>局面</h3>牌墙剩余 <b>${st.wall}</b> 张 · 阶段 ${st.phase}`;
+  if (st.last_action) html += `<div class="muted">上一步：玩家${st.last_action.player} ${st.last_action.type}${st.last_action.tile>=0?" "+tileInfo(st.last_action.tile).txt:""}</div>`;
+  if (st.result) html += `<div class="result">${st.result.text}</div>`;
+  html += `</div>`;
+  const a = st.analysis;
+  if (a && a.nn){
+    const top = a.nn[0];
+    html += `<div class="panel"><h3>神经网络：玩家${a.player} 打哪张？</h3>`;
+    html += a.nn.map(r=>`<div class="bar ${r===top?"chosen":""}">${tile(r.tile,"small")}<div class="track"><div class="fill" style="width:${(r.p*100).toFixed(1)}%"></div></div><span class="pct">${(r.p*100).toFixed(1)}%</span></div>`).join("");
+    html += `</div>`;
+  }
+  if (a && a.rule){
+    html += `<div class="panel"><h3>规则分析（向听 / 进张）</h3><div class="muted">当前 ${a.shanten<0?"已胡":a.shanten+" 向听"}</div><table><tr><th>打</th><th>向听</th><th>进张</th></tr>`;
+    html += a.rule.slice(0,8).map((r,k)=>`<tr class="${k===0?"best":""}"><td>${tile(r.tile,"small")}</td><td>${r.shanten}</td><td>${r.effective}</td></tr>`).join("");
+    html += `</table></div>`;
+  }
+  if (a && a.phase==="RESPOND"){
+    html += `<div class="panel"><h3>响应：玩家${a.player}</h3>可选：${a.legal.join(" / ")}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function render(st){
+  if(!st.started){ document.getElementById("status").textContent="未开局"; return; }
+  renderPlayers(st); renderAside(st);
+  document.getElementById("status").textContent = st.finished ? "已结束" : `轮到玩家${st.to_act[0]}`;
+  if (st.finished && auto){ clearInterval(auto); auto=null; document.getElementById("auto").textContent="自动播放"; }
+}
+
+document.getElementById("new").onclick = async()=> render(await api("/api/new?seed="+document.getElementById("seed").value,"POST"));
+document.getElementById("step").onclick = async()=> render(await api("/api/step","POST"));
+document.getElementById("step10").onclick = async()=> render(await api("/api/step?n=10","POST"));
+document.getElementById("end").onclick = async()=> render(await api("/api/step?n=1000","POST"));
+document.getElementById("auto").onclick = function(){
+  if(auto){ clearInterval(auto); auto=null; this.textContent="自动播放"; return; }
+  this.textContent="停止"; auto = setInterval(async()=>render(await api("/api/step","POST")), 700);
+};
+api("/api/state").then(render);
+</script>
+</body>
+</html>
