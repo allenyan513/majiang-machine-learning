@@ -4,6 +4,16 @@
 
 规则：简化推倒胡（万条筒字 136 张，碰/杠/胡，无吃无花无番型）。
 
+## 教程
+
+配套写了一份 13 章的教程，讲怎么从零把这个项目写出来（引擎 → 规则 bot → 监督学习 → PPO → 评估）：[docs/](docs/README.md)。
+
+在 GitHub 上可以直接读 Markdown；想要带目录导航的网页版：
+
+```bash
+python3 -m http.server 8080 --directory docs   # 打开 http://localhost:8080/
+```
+
 ## 安装
 
 ```bash
