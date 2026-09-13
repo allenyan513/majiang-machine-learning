@@ -1,11 +1,15 @@
-"""规则 bot：牌效率 + 简单防守。
+"""规则 bot：牌效率 + 防守。
 
 决策逻辑（按优先级）：
     1. 能胡就胡（自摸 / 点炮）
     2. 碰 / 杠：只在向听数减少（杠：不增加）时才做
-    3. 打牌：向听数最低 > 进张最多 > 危险度最低
-       "危险度"只有一条启发式：对手副露 >= DANGER_MELDS 时视为可能听牌，
-       他打过的牌相对安全（这是弱假设——中国规则没有振听，但作为第一版够用）
+    3. 打牌（defense="v2"，见 _discard_v2）：向听数最低优先；同向听内按期望分数取最大
+         EV(d) = (1 - 危险度(d)) × V(打后状态) - 危险度(d) × 1
+       危险度 = 该牌被人胡的概率；V = 打后处于 (向听, 进张, 牌墙, 威胁) 状态时的平均终局分数。
+       两者都是从规则自对局里统计出来的表（defense.py / defense_tables.py），
+       所以这一步实际上是"策略迭代"：评估当前策略的价值，再据此改进策略。
+
+    defense="v1" 保留阶段 2 的旧逻辑（对手 >=3 副露视为听牌，他打过的牌算安全），用于对照。
 
 它有两个用途：
     - 作为"打得像样"的基线，让对局有意义（流局率降下来）
@@ -18,12 +22,19 @@ from majiang.engine.hand import MeldType
 from majiang.engine.shanten import discard_options, shanten
 from majiang.engine.tile import NUM_TILE_TYPES, is_honor, is_terminal
 
+from . import defense
 from .base import Agent
 
-DANGER_MELDS = 3  # 对手副露达到这么多组，认为他可能听牌
+DANGER_MELDS = 3  # v1：对手副露达到这么多组，认为他可能听牌
 
 
 class RuleAgent(Agent):
+    DEAL_IN_COST = 1.0    # 放炮损失（RON_POINTS）
+
+    def __init__(self, defense: str = "v2"):
+        assert defense in ("v1", "v2")
+        self.defense = defense
+
     def act(self, obs: Observation) -> Action:
         legal = obs.legal_actions
         by_type = {a.type: a for a in legal}
@@ -64,6 +75,11 @@ class RuleAgent(Agent):
                 if shanten(after, n_melds + dm) <= best_shanten:
                     return by_type[kt]
 
+        if self.defense == "v1":
+            return self._discard_v1(obs, options, best_shanten)
+        return self._discard_v2(obs, options, best_shanten)
+
+    def _discard_v1(self, obs: Observation, options, best_shanten: int) -> Action:
         danger = self._danger_map(obs)
         push = best_shanten <= 0  # 自己已听牌就不防守
 
@@ -75,6 +91,22 @@ class RuleAgent(Agent):
             return (s, danger[d], -n, -iso)
 
         best = min(options, key=key)
+        return Action(ActionType.DISCARD, best[0])
+
+    def _discard_v2(self, obs: Observation, options, best_shanten: int) -> Action:
+        threat = defense.max_threat(obs)
+        danger = defense.danger_map(obs)
+
+        def key(opt: tuple[int, int, int]) -> tuple:
+            d, s, n = opt
+            v = defense.value(s, n, obs.wall_remaining, threat)
+            ev = (1 - danger[d]) * v - danger[d] * self.DEAL_IN_COST
+            iso = 2 if is_honor(d) else 1 if is_terminal(d) else 0
+            # 向听数永远优先：价值表跨向听比较不可靠（"1 向听 20 进张"多出现在开局，价值被高估）；
+            # 同向听内用 EV 权衡进张 vs 危险，EV 相同再回到进张数和孤张优先
+            return (-s, round(ev, 4), n, iso)
+
+        best = max(options, key=key)
         return Action(ActionType.DISCARD, best[0])
 
     # ---------------- 工具
