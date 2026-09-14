@@ -149,6 +149,7 @@ function renderReplay(d){
     <span>优势 A</span><b class="${s.adv>0?"pos":"neg"}">${s.adv>0?"+":""}${s.adv.toFixed(3)}</b>
     <span>回报目标 G</span><b>${s.ret.toFixed(3)}</b>
     <span>塑形奖励</span><b>${s.r_shaping>=0?"+":""}${s.r_shaping.toFixed(3)}</b>
+    <span>危险度惩罚</span><b>${(s.r_danger||0).toFixed(3)}</b>
     <span>终局奖励</span><b>${s.r_terminal>=0?"+":""}${s.r_terminal.toFixed(1)}</b>
     <span>π(打出的牌)</span><b>${(s.p_action*100).toFixed(1)}%</b>
     <span>决策熵</span><b>${s.entropy.toFixed(2)}</b>

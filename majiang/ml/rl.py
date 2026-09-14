@@ -6,6 +6,8 @@
     1. 多进程并行打 N 局：每局随机 2 个座位是学习者（按概率采样打牌），其余是规则 bot
        记录学习者每次打牌的 (特征, 动作, log 概率, 价值估计, 奖励)
     2. 奖励 = 终局分数 + 势函数塑形（向听数减少 -> 小正奖励；Ng et al. 1999，不改变最优策略）
+       + 可选的危险度惩罚（--danger λ：每张打出的牌 -λ × 该牌被胡的概率；这是密集的"期望放炮损失"，
+         不是势函数，会把策略往安全的方向偏——第 16 章的实验）
     3. GAE 算优势，PPO 剪切目标更新策略 + 价值头，外加对老师（监督模型）的 KL 惩罚
     4. 每隔几轮用贪心策略对 3 个规则 bot 评估，记录到 CSV（画曲线用）。评估时顺手记**行为探针**：
        危险牌打出率、弃听率、第 8 巡向听、决策熵——分数曲线是结果，这些是原因
@@ -76,8 +78,9 @@ class LearnerAgent(Agent):
     THREAT_THRESHOLD = 0.5    # 对手听牌概率超过它算"高威胁局面"
 
     def __init__(self, model: ActorCritic, traj: Trajectory, rng: random.Random, shaping: float, greedy: bool = False,
-                 probes: list | None = None, snapshots: list | None = None):
+                 probes: list | None = None, snapshots: list | None = None, danger_coef: float = 0.0):
         self.model, self.traj, self.rng, self.shaping, self.greedy = model, traj, rng, shaping, greedy
+        self.danger_coef = danger_coef
         self.rule = RuleAgent()
         self.prev_phi: float | None = None
         self.probes = probes        # 评估时：每次打牌记一条行为探针
@@ -106,16 +109,18 @@ class LearnerAgent(Agent):
         phi = -s_after
         r = 0.0 if self.prev_phi is None else self.shaping * (phi - self.prev_phi)
         self.prev_phi = phi
+        need_danger = self.danger_coef > 0 or self.probes is not None or self.snapshots is not None
+        danger = defense.danger_map(obs) if need_danger else None
+        r_danger = -self.danger_coef * danger[a] if self.danger_coef > 0 else 0.0
         t = self.traj
         t.x.append(x)
         t.a.append(a)
         t.logp.append(float(logp_all[a]))
         t.v.append(float(v[0]))
-        t.r.append(r)
+        t.r.append(r + r_danger)
         if self.probes is not None or self.snapshots is not None:
             probs = logp_all.exp()
             ent = float(-(probs * logp_all.clamp(min=-50)).sum())
-            danger = defense.danger_map(obs)
             threat = defense.max_threat(obs)
             s_best = shanten(obs.hand, len(obs.melds))  # 14 张的向听 = 最优打法后的向听
             probe = {
@@ -126,7 +131,7 @@ class LearnerAgent(Agent):
             if self.probes is not None:
                 self.probes.append(probe)
             if self.snapshots is not None:
-                self.snapshots.append({**probe, "action": a, "v": float(v[0]), "r_shaping": r,
+                self.snapshots.append({**probe, "action": a, "v": float(v[0]), "r_shaping": r, "r_danger": r_danger,
                                        "p_action": float(probs[a]),
                                        "probs": {int(i): round(float(probs[i]), 4) for i in range(34) if probs[i] > 1e-4},
                                        "danger_map": [round(d, 4) for d in danger]})
@@ -135,7 +140,7 @@ class LearnerAgent(Agent):
 
 def _rollout(args: tuple) -> dict:
     """打一批局，返回拼好的轨迹数组。"""
-    path, version, seeds, n_learners, shaping = args
+    path, version, seeds, n_learners, shaping, danger_coef = args
     model = _get_model(path, version)
     X, A, LOGP, V, R, DONE = [], [], [], [], [], []
     scores: list[int] = []
@@ -144,7 +149,8 @@ def _rollout(args: tuple) -> dict:
         learner_seats = rng.sample(range(4), n_learners)
         trajs = {p: Trajectory() for p in learner_seats}
         agents: list[Agent] = [
-            LearnerAgent(model, trajs[p], rng, shaping) if p in learner_seats else RuleAgent() for p in range(4)
+            LearnerAgent(model, trajs[p], rng, shaping, danger_coef=danger_coef) if p in learner_seats else RuleAgent()
+            for p in range(4)
         ]
         g = Game(seed=seed, dealer=seed % 4)
         g.start()
@@ -208,10 +214,11 @@ def summarize_probes(probes: list[dict]) -> dict:
 
 def _trace_game(args: tuple) -> dict:
     """录一局：贪心学习者坐座位 0，每次打牌存上帝视角快照 + 学习信号。终局后补 GAE 优势。"""
-    path, version, seed, shaping, gamma, lam = args
+    path, version, seed, shaping, gamma, lam, danger_coef = args
     model = _get_model(path, version)
     traj, snaps = Trajectory(), []
-    agents: list[Agent] = [LearnerAgent(model, traj, random.Random(seed), shaping, greedy=True, snapshots=snaps)]
+    agents: list[Agent] = [LearnerAgent(model, traj, random.Random(seed), shaping, greedy=True, snapshots=snaps,
+                                        danger_coef=danger_coef)]
     agents += [RuleAgent() for _ in range(3)]
     g = Game(seed=seed, dealer=0)
     g.start()
@@ -315,7 +322,7 @@ def train(init: str, out: str, iters: int, games: int, n_learners: int = 2, shap
           lr: float = 1e-4, epochs: int = 3, bs: int = 1024, clip: float = 0.2, vf_coef: float = 0.5,
           ent_coef: float = 0.01, kl_coef: float = 0.05, gamma: float = 1.0, lam: float = 0.95,
           value_warmup: int = 2, eval_every: int = 5, eval_games: int = 200, workers: int | None = None,
-          seed: int = 0, log_csv: str | None = None) -> None:
+          seed: int = 0, log_csv: str | None = None, danger_coef: float = 0.0) -> None:
     workers = workers or os.cpu_count() or 1
     device = pick_device()
     init_model = load(init)
@@ -360,7 +367,7 @@ def train(init: str, out: str, iters: int, games: int, n_learners: int = 2, shap
     def checkpoint(it: int, pool: Pool) -> None:
         """存权重 + 录一局轨迹（固定 seed，好跨版本对比）。"""
         model.cpu(); save(model, os.path.join(ckpt_dir, f"iter_{it:03d}.pt")); model.to(device)
-        trace = pool.apply(_trace_game, ((weights_path, it, 20_000_000 + seed, shaping, gamma, lam),))
+        trace = pool.apply(_trace_game, ((weights_path, it, 20_000_000 + seed, shaping, gamma, lam, danger_coef),))
         with open(os.path.join(ckpt_dir, f"trace_{it:03d}.json"), "w") as f:
             json.dump(trace, f)
 
@@ -384,7 +391,7 @@ def train(init: str, out: str, iters: int, games: int, n_learners: int = 2, shap
             seeds = list(range(game_seed, game_seed + games))
             game_seed += games
             chunks = [seeds[i::workers] for i in range(workers)]
-            parts = pool.map(_rollout, [(weights_path, it, c, n_learners, shaping) for c in chunks if c])
+            parts = pool.map(_rollout, [(weights_path, it, c, n_learners, shaping, danger_coef) for c in chunks if c])
             batch = {k: np.concatenate([p[k] for p in parts]) for k in ("x", "a", "logp", "v", "r", "done", "scores")}
             batch["adv"], batch["ret"] = gae(batch["r"], batch["v"], batch["done"], gamma, lam)
             stats = ppo_update(model, teacher, opt, batch, device, epochs, bs, clip, vf_coef, ent_coef, kl_coef,
@@ -425,6 +432,7 @@ def main() -> None:
     ap.add_argument("--games", type=int, default=1024)
     ap.add_argument("--learners", type=int, default=2)
     ap.add_argument("--shaping", type=float, default=0.1)
+    ap.add_argument("--danger", type=float, default=0.0, help="危险度惩罚系数 λ：每张打出的牌 -λ × 被胡概率")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--kl", type=float, default=0.05)
     ap.add_argument("--ent", type=float, default=0.01)
@@ -434,7 +442,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
     train(a.init, a.out, a.iters, a.games, a.learners, a.shaping, a.lr, kl_coef=a.kl, ent_coef=a.ent,
-          eval_every=a.eval_every, eval_games=a.eval_games, workers=a.workers, seed=a.seed)
+          eval_every=a.eval_every, eval_games=a.eval_games, workers=a.workers, seed=a.seed, danger_coef=a.danger)
 
 
 if __name__ == "__main__":
