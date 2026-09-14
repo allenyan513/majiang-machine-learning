@@ -2,6 +2,8 @@
 
 > 对应代码：`majiang/agents/defense.py`、`majiang/agents/defense_tables.py`、`majiang/ml/calibrate_defense.py`、`majiang/agents/rule_agent.py`（`defense="v2"`）
 
+> **计分说明**：本章的数字是在初版计分 `RON_POINTS = 1`（点炮扣 1 分）下测得的。仓库现在默认 `RON_POINTS = 3`，同样的命令跑出来数字会不同——对照表和原因见[第 15 章](15-rescoring.md)。要复现本章，把 `majiang/engine/rules.py` 里的常量改回 1。
+
 第 12 章把"改进老师"列为最推荐的路线：规则 bot 的防守只有一条弱启发式，补上真正的防守，老师变强，整条流水线的终点跟着抬高。这一章记录我们真的走了一遍之后发生了什么。
 
 剧透：防守模块本身做对了，**但规则 bot 没有变强**。原因不在算法，在第 0 章那个"把计分砍到最简"的决定。这一章是整份教程里最能说明"规则设计决定学习上限"的一章。

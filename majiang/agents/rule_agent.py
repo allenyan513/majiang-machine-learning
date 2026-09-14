@@ -18,6 +18,7 @@
 
 from majiang.engine.actions import Action, ActionType
 from majiang.engine.game import Observation
+from majiang.engine.rules import RON_POINTS
 from majiang.engine.hand import MeldType
 from majiang.engine.shanten import discard_options, shanten
 from majiang.engine.tile import NUM_TILE_TYPES, is_honor, is_terminal
@@ -29,7 +30,7 @@ DANGER_MELDS = 3  # v1：对手副露达到这么多组，认为他可能听牌
 
 
 class RuleAgent(Agent):
-    DEAL_IN_COST = 1.0    # 放炮损失（RON_POINTS）
+    DEAL_IN_COST = float(RON_POINTS)  # 放炮损失
 
     def __init__(self, defense: str = "v2"):
         assert defense in ("v1", "v2")

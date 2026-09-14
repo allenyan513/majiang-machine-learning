@@ -118,7 +118,7 @@ def test_ron_scores_and_priority_over_pon():
     g.step(2, Action(ActionType.PON, 18))
     g.step(3, Action(ActionType.RON, 18))
     assert g.finished and g.result.winner == 3 and g.result.loser == 0
-    assert g.result.scores == [-1, 0, 0, 1]
+    assert g.result.scores == [-3, 0, 0, 3]
 
 
 def test_ankan_then_replacement_draw():

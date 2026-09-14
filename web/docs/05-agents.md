@@ -2,6 +2,8 @@
 
 > 对应代码：`majiang/agents/`、`majiang/evaluate.py`、`tests/test_rule_agent.py`
 
+> **计分说明**：本章的数字是在初版计分 `RON_POINTS = 1`（点炮扣 1 分）下测得的。仓库现在默认 `RON_POINTS = 3`，同样的命令跑出来数字会不同——对照表和原因见[第 15 章](15-rescoring.md)。要复现本章，把 `majiang/engine/rules.py` 里的常量改回 1。
+
 有了引擎，现在需要一个会打牌的东西。这一章写两个 agent（随机、规则）和一套评估工具。规则 bot 会成为阶段 3 的**老师**和整个项目的**基线**——后面每一个模型的价值，都是用"比它强多少"来衡量的。
 
 ## Agent 接口：一个方法
@@ -43,6 +45,8 @@ class RandomAgent(Agent):
 3. **引擎压测**：`test_tile_conservation_through_whole_game` 靠它遍历状态空间
 
 ## 规则 bot：牌效率 + 一点防守
+
+> 本章讲的是规则 bot 的第一版（代码里的 `RuleAgent(defense="v1")`）。第 13 章给它加了校准式防守（`v2`），现在是默认值；打牌逻辑的骨架不变。
 
 规则 bot 的决策逻辑按优先级排：
 

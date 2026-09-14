@@ -8,7 +8,7 @@
 
 ## 教程
 
-配套写了一份 15 章的教程，讲怎么从零把这个项目写出来（引擎 → 规则 bot → 监督学习 → PPO → 评估 → 改进老师 → 转向日麻）：[web/docs/](web/docs/README.md)。
+配套写了一份 16 章的教程，讲怎么从零把这个项目写出来（引擎 → 规则 bot → 监督学习 → PPO → 评估 → 改进老师 → 转向日麻）：[web/docs/](web/docs/README.md)。
 
 在 GitHub 上可以直接读 Markdown；想要带目录导航的网页版：
 
@@ -33,12 +33,12 @@ uv run python -m majiang.evaluate --agents rule,random,random,random --n 500
 ## 阶段 3：监督学习
 
 ```bash
-uv run python -m majiang.ml.generate --games 10000 --out data/rule_10k.npz   # ~2 分钟，10 核
-uv run python -m majiang.ml.train --data data/rule_10k.npz --epochs 8 --out models/discard.pt   # ~30 秒 (MPS)
+uv run python -m majiang.ml.generate --games 30000 --out data/rule_30k.npz   # ~5 分钟，10 核
+uv run python -m majiang.ml.train --data data/rule_30k.npz --epochs 8 --out models/discard.pt   # ~90 秒 (MPS)
 uv run python -m majiang.evaluate --agents nn:models/discard.pt,rule,rule,rule --n 300
 ```
 
-参考结果（1 万局数据，60 万参数的一维 CNN）：验证集与规则 bot 一致率 86.8%；实战对 3 个规则 bot 胜率 25.0%（打平）。
+参考结果（3 万局数据，60 万参数的一维 CNN，`RON_POINTS = 3`）：验证集与规则 bot 一致率 86.9%；4000 局配对评估比老师低 0.048 ± 0.058（噪声范围内）。1 万局数据时一致率 84.3%、落后 0.10——数据量的作用见教程第 15 章。
 
 ## 阶段 4：强化学习（PPO 微调）
 
@@ -52,7 +52,7 @@ uv run python -m majiang.ml.compare --candidates rule,nn:models/discard.pt,nn:mo
 
 **评估注意**：单局分数的标准差约 1.0，2000 局独立评估的 95% 区间是 ±0.04，分辨不出小的进步。`compare.py` 让各候选打完全相同的牌局（同 seed、同座位），比差值能把噪声压低一些。
 
-第一次尝试（60 轮 × 1024 局，塑形 0.1，KL 0.05）：贪心评估胜率 20% → 23.5%，配对评估与规则 bot / 监督模型差距均在 ±0.04 内——**没有超过老师**。分析见 PR #3。
+两次尝试（旧计分 / 新计分各 60 轮）都**没有超过老师**：配对评估与监督模型无差别。新计分下单局分数标准差 1.6，400 局的评估曲线是纯噪声。分析见教程第 10、15 章。
 
 ## 可视化
 
