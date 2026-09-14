@@ -60,5 +60,18 @@ def test_rl_smoke(tmp_path):
           log_csv=str(tmp_path / "log.csv"))
     assert out.exists() and (tmp_path / "rl_last.pt").exists()
     rows = open(tmp_path / "log.csv").read().strip().splitlines()
-    assert len(rows) == 3  # header + 2 iters
+    assert len(rows) == 4  # header + iter 0（起点评估）+ 2 iters
     assert isinstance(load(str(out)), ActorCritic)
+
+
+def test_summarize_probes():
+    from majiang.ml.rl import summarize_probes
+
+    probes = [
+        {"turn": 8, "danger": 0.05, "dangerous": True, "threat": 0.6, "high_threat": True, "fold": True, "shanten": 2, "entropy": 0.5},
+        {"turn": 9, "danger": 0.0, "dangerous": False, "threat": 0.6, "high_threat": True, "fold": False, "shanten": 1, "entropy": 0.3},
+        {"turn": 8, "danger": 0.01, "dangerous": False, "threat": 0.1, "high_threat": False, "fold": False, "shanten": 0, "entropy": 0.1},
+    ]
+    s = summarize_probes(probes)
+    assert s["danger_rate"] == 1 / 3 and s["fold_rate"] == 0.5 and s["shanten8"] == 1.0
+    assert summarize_probes([])["fold_rate"] == 0.0

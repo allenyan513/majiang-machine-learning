@@ -5,6 +5,7 @@ web/
   server.py       统一服务：/docs 教程、/play 游戏、/api 引擎 + 模型（标准库，无框架）
   docs/           教程 Markdown + 离线阅读器 index.html
   play/index.html 单机游戏 / 观战前端
+  train/index.html RL 训练面板：曲线、行为探针、带学习信号的对局回放（读 models/<run>_log.csv 和 <run>_ckpt/）
   Dockerfile      一个镜像跑全站
 ```
 

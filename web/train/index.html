@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>看见强化学习</title>
+<style>
+  :root { --bg:#f6f8fa; --panel:#fff; --line:#d7dce2; --txt:#1f2328; --muted:#656d76; --accent:#1f5fa8;
+          --m:#c0392b; --s:#1e8449; --p:#1f5fa8; --z:#222; --pos:#1e8449; --neg:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system,"PingFang SC",sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; gap:12px; align-items:center; padding:8px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header .nav a { color:var(--accent); text-decoration:none; margin-right:10px; }
+  header input { width:90px; border:1px solid var(--line); border-radius:4px; padding:3px 6px; }
+  button { padding:5px 12px; border:1px solid #c9ced6; background:#fff; border-radius:4px; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #status { margin-left:auto; color:var(--muted); font-size:13px; }
+  main { max-width:1280px; margin:0 auto; padding:14px 16px 60px; }
+  h2 { font-size:16px; margin:22px 0 8px; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .panel h3 { margin:0 0 4px; font-size:13.5px; }
+  canvas { width:100%; height:180px; display:block; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:4px; }
+  .legend i { display:inline-block; width:14px; height:3px; margin-right:4px; vertical-align:middle; }
+  /* 回放 */
+  .replay { display:grid; grid-template-columns: 1fr 380px; gap:14px; }
+  .steps { display:flex; gap:3px; flex-wrap:wrap; margin:8px 0; }
+  .steps button { width:34px; padding:3px 0; font-size:12px; }
+  .steps button.on { outline:2px solid var(--accent); }
+  .steps button.pos { background:#e6f4ea; } .steps button.neg { background:#fdecea; }
+  .tiles { display:inline-flex; gap:2px; flex-wrap:wrap; align-items:flex-end; }
+  .tile { display:inline-flex; align-items:center; justify-content:center; width:24px; height:34px; border-radius:3px;
+          background:linear-gradient(#fffdf7,#efe9dc); border:1px solid #b9b2a3; border-bottom:3px solid #2e8b57; font-weight:700; font-size:12px; }
+  .tile.m { color:var(--m); } .tile.s { color:var(--s); } .tile.p { color:var(--p); } .tile.z { color:var(--z); }
+  .tile.chosen { outline:3px solid #e74c3c; }
+  .tile.draw { margin-left:8px; }
+  .row { display:flex; gap:10px; align-items:center; margin:5px 0; flex-wrap:wrap; }
+  .row .label { width:70px; color:var(--muted); font-size:12px; }
+  .meld { display:inline-flex; gap:1px; padding:2px 3px; background:#eee; border-radius:4px; }
+  .bar { display:grid; grid-template-columns:26px 1fr 50px 50px; gap:6px; align-items:center; margin:2px 0; font-size:12px; }
+  .bar .track { height:12px; background:#eef1f5; border-radius:3px; overflow:hidden; }
+  .bar .fill { height:100%; background:#3498db; }
+  .bar.chosen .fill { background:#e74c3c; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:13px; font-variant-numeric:tabular-nums; }
+  .kv b.pos { color:var(--pos); } .kv b.neg { color:var(--neg); }
+  .empty { padding:40px; text-align:center; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <span class="nav"><a href="/">首页</a><a href="/docs/">教程</a><a href="/play/">游戏</a></span>
+  <label class="muted">run <input id="run" value="rl"></label>
+  <button id="load" class="primary">加载</button>
+  <label class="muted"><input id="live" type="checkbox" checked> 每 5 秒刷新（训练中）</label>
+  <span id="status"></span>
+</header>
+<main id="main"><div class="empty">加载中…</div></main>
+<script>
+const HONORS = ["东","南","西","北","中","发","白"];
+function tileInfo(t){ if(t>=27) return {txt:HONORS[t-27], cls:"z"}; const n=t%9+1, k=Math.floor(t/9); return {txt:n+"万条筒"[k], cls:"msp"[k]}; }
+function tile(t, cls=""){ const i=tileInfo(t); return `<span class="tile ${i.cls} ${cls}">${i.txt}</span>`; }
+function tiles(arr, cls=""){ return `<span class="tiles">${arr.map(t=>tile(t,cls)).join("")}</span>`; }
+
+const COLORS = ["#1f5fa8","#e67e22","#1e8449","#c0392b","#8e44ad","#7f8c8d"];
+const state = { run:"rl", data:null, traceIter:null, trace:null, step:0, timer:null };
+
+// ---------- 极简折线图（canvas，无依赖）
+function lineChart(canvas, series, opts={}){
+  const dpr = window.devicePixelRatio||1, W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  const ctx = canvas.getContext("2d"); ctx.scale(dpr,dpr);
+  const pad = {l:44, r:10, t:8, b:22};
+  const pts = series.flatMap(s=>s.points);
+  if (!pts.length){ ctx.fillStyle="#999"; ctx.fillText("没有数据", pad.l, H/2); return; }
+  let xs = pts.map(p=>p[0]), ys = pts.map(p=>p[1]);
+  let x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  if (opts.zero){ y0=Math.min(y0,0); y1=Math.max(y1,0); }
+  if (opts.ymin!=null) y0=opts.ymin; if (opts.ymax!=null) y1=opts.ymax;
+  if (y1===y0){ y1=y0+1; } if (x1===x0){ x1=x0+1; }
+  const X = x=>pad.l+(x-x0)/(x1-x0)*(W-pad.l-pad.r), Y = y=>pad.t+(y1-y)/(y1-y0)*(H-pad.t-pad.b);
+  ctx.strokeStyle="#e5e8ec"; ctx.lineWidth=1; ctx.font="11px sans-serif"; ctx.fillStyle="#888";
+  for (let i=0;i<=4;i++){ const y=y0+(y1-y0)*i/4; ctx.beginPath(); ctx.moveTo(pad.l,Y(y)); ctx.lineTo(W-pad.r,Y(y)); ctx.stroke();
+    ctx.fillText((opts.pct? (y*100).toFixed(0)+"%" : y.toFixed(Math.abs(y1-y0)<2?2:1)), 2, Y(y)+4); }
+  for (let i=0;i<=4;i++){ const x=x0+(x1-x0)*i/4; ctx.fillText(x.toFixed(0), X(x)-6, H-6); }
+  if (opts.zero){ ctx.strokeStyle="#999"; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,Y(0)); ctx.lineTo(W-pad.r,Y(0)); ctx.stroke(); ctx.setLineDash([]); }
+  if (opts.hline!=null){ ctx.strokeStyle="#bbb"; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,Y(opts.hline)); ctx.lineTo(W-pad.r,Y(opts.hline)); ctx.stroke(); ctx.setLineDash([]); }
+  series.forEach((s,i)=>{
+    ctx.strokeStyle = s.color||COLORS[i%COLORS.length]; ctx.lineWidth = s.width||1.8; ctx.beginPath();
+    s.points.forEach((p,k)=>{ k? ctx.lineTo(X(p[0]),Y(p[1])) : ctx.moveTo(X(p[0]),Y(p[1])); }); ctx.stroke();
+    if (s.dots){ ctx.fillStyle=ctx.strokeStyle; s.points.forEach(p=>{ ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),3,0,7); ctx.fill(); }); }
+  });
+  if (opts.markX!=null){ ctx.strokeStyle="#e74c3c"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(X(opts.markX),pad.t); ctx.lineTo(X(opts.markX),H-pad.b); ctx.stroke(); }
+}
+function col(rows, key, filter=r=>r[key]!=null){ return rows.filter(filter).map(r=>[r.iter, r[key]]); }
+function chart(id, title, note, series, opts){
+  return `<div class="panel"><h3>${title}</h3><div class="muted">${note||""}</div><canvas id="${id}"></canvas>
+    <div class="legend">${series.map((s,i)=>`<span><i style="background:${s.color||COLORS[i%COLORS.length]}"></i>${s.name}</span>`).join("")}</div></div>`;
+}
+
+// ---------- 页面
+function renderCurves(d){
+  const rows = d.rows;
+  const ev = rows.filter(r=>r.eval_score!=null);
+  const charts = [
+    ["c1","均分（>0 = 超过规则 bot）","灰：采样策略（含探索噪声）；红点：贪心评估。每局标准差约 1.6，评估 400 局的标准误约 0.08——小于它的起伏是噪声",
+      [{name:"采样均分", points:col(rows,"train_score"), color:"#aaa"},{name:"贪心评估", points:col(rows,"eval_score"), color:"#e74c3c", dots:true}], {zero:true}],
+    ["c2","胜率 / 放炮率","0.25 = 四人游戏基准线。放炮率降但胜率也降 = 变保守而不是变强",
+      [{name:"胜率", points:col(rows,"eval_win"), dots:true},{name:"放炮率", points:col(rows,"eval_deal_in"), color:"#c0392b", dots:true}], {pct:true, hline:0.25}],
+    ["c3","行为探针：防守","危险牌打出率 = 打出的牌里危险度 ≥ 4% 的比例（第 13 章的表当探针）；弃听率 = 对手威胁 ≥ 50% 时，打出让向听变差的牌的比例",
+      [{name:"危险牌打出率", points:col(rows,"eval_danger_rate"), dots:true},{name:"弃听率", points:col(rows,"eval_fold_rate"), color:"#8e44ad", dots:true}], {pct:true, ymin:0}],
+    ["c4","行为探针：进攻 / 探索","第 8 巡打完后的向听数（越低进攻越快）；决策熵（越低越果断）",
+      [{name:"第 8 巡向听", points:col(rows,"eval_shanten8"), color:"#1e8449", dots:true},{name:"贪心决策熵", points:col(rows,"eval_entropy"), color:"#e67e22", dots:true}], {}],
+    ["c5","偏离老师的程度","对监督模型的 KL 越大，策略改得越多；训练熵下降 = 更自信",
+      [{name:"对老师的 KL", points:col(rows,"kl_teacher")},{name:"训练策略熵", points:col(rows,"entropy"), color:"#e67e22"}], {ymin:0}],
+    ["c6","损失","价值损失不降 = critic 学不到终局；clipfrac = 被 PPO 剪掉的样本比例",
+      [{name:"价值损失", points:col(rows,"value_loss")},{name:"clipfrac", points:col(rows,"clipfrac"), color:"#8e44ad"}], {ymin:0}],
+  ];
+  let html = `<h2>训练曲线 <span class="muted">run=${d.run} · ${rows.length} 轮 · ${ev.length} 次评估</span></h2><div class="grid">`;
+  html += charts.map(c=>chart(c[0],c[1],c[2],c[3],c[4])).join("");
+  html += `</div>`;
+  return {html, draw:()=>charts.forEach(c=>lineChart(document.getElementById(c[0]), c[3], c[4]))};
+}
+
+function renderReplay(d){
+  const t = state.trace;
+  let html = `<h2>一局回放 + 学习信号 <span class="muted">每次评估都用同一个 seed 录一局（学习者坐座位 0，贪心），跨版本可比</span></h2>`;
+  html += `<div class="row"><span class="label">版本</span>${d.traces.map(i=>`<button class="${i===state.traceIter?"primary":""}" onclick="loadTrace(${i})">iter ${i}</button>`).join(" ")}</div>`;
+  if (!t){ return {html: html + `<div class="muted">选一个版本</div>`, draw:()=>{}}; }
+  const steps = t.steps, k = Math.min(state.step, steps.length-1), s = steps[k];
+  html += `<div class="muted">${t.result}</div>`;
+  html += `<div class="steps">${steps.map((x,i)=>`<button class="${i===k?"on":""} ${x.adv>0.05?"pos":x.adv<-0.05?"neg":""}" onclick="state.step=${i};render()">${i+1}</button>`).join("")}</div>`;
+  html += `<div class="panel"><h3>整局的学习信号</h3><div class="muted">V：价值头估计"这局最后能得几分"；A：优势（这步比预期好还是差，绿正红负）；r：奖励，塑形的每步都有、终局只在最后一步</div><canvas id="c7" style="height:160px"></canvas>
+    <div class="legend"><span><i style="background:#1f5fa8"></i>V(s)</span><span><i style="background:#e67e22"></i>优势 A</span><span><i style="background:#1e8449"></i>塑形奖励</span><span><i style="background:#c0392b"></i>终局奖励</span></div></div>`;
+  html += `<div class="replay" style="margin-top:12px"><div class="panel">`;
+  const b = s.board;
+  for (let p=0;p<4;p++){
+    let hand = [...b.hands[p]];
+    let draw = "";
+    if (p===0 && b.last_draw>=0){ const j=hand.indexOf(b.last_draw); if(j>=0) hand.splice(j,1); draw = tile(b.last_draw, "draw"+(b.last_draw===s.action?" chosen":"")); }
+    const handHtml = hand.map(x=>tile(x, p===0&&x===s.action&&!(b.last_draw===s.action)?"chosen":"")).join("");
+    html += `<div class="row"><span class="label">${p===0?"学习者":"玩家"+p}</span><span class="tiles">${handHtml}${draw}</span> ${b.melds[p].map(m=>`<span class="meld">${tiles(Array(m.type==="PON"?3:4).fill(m.tile))}</span>`).join("")}</div>`;
+    html += `<div class="row"><span class="label"></span>${tiles(b.rivers[p])}</div>`;
+  }
+  html += `<div class="muted">第 ${k+1} 次打牌 · 牌墙剩 ${b.wall} · 红框 = 打出的牌</div></div>`;
+  html += `<div class="panel"><h3>这一步</h3><div class="kv">
+    <span>V(s)</span><b>${s.v.toFixed(3)}</b>
+    <span>优势 A</span><b class="${s.adv>0?"pos":"neg"}">${s.adv>0?"+":""}${s.adv.toFixed(3)}</b>
+    <span>回报目标 G</span><b>${s.ret.toFixed(3)}</b>
+    <span>塑形奖励</span><b>${s.r_shaping>=0?"+":""}${s.r_shaping.toFixed(3)}</b>
+    <span>终局奖励</span><b>${s.r_terminal>=0?"+":""}${s.r_terminal.toFixed(1)}</b>
+    <span>π(打出的牌)</span><b>${(s.p_action*100).toFixed(1)}%</b>
+    <span>决策熵</span><b>${s.entropy.toFixed(2)}</b>
+    <span>打后向听</span><b>${s.shanten}</b>
+    <span>打出牌的危险度</span><b class="${s.dangerous?"neg":""}">${(s.danger*100).toFixed(1)}%</b>
+    <span>最大对手威胁</span><b class="${s.high_threat?"neg":""}">${(s.threat*100).toFixed(0)}%</b>
+    <span>弃听</span><b>${s.fold?"是":"否"}</b></div>
+    <h3 style="margin-top:10px">打牌概率 / 危险度</h3>`;
+  const entries = Object.entries(s.probs).map(([t,p])=>[+t,p]).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  html += entries.map(([t,p])=>`<div class="bar ${t===s.action?"chosen":""}">${tile(t)}<div class="track"><div class="fill" style="width:${(p*100).toFixed(1)}%"></div></div><span>${(p*100).toFixed(1)}%</span><span class="muted">危 ${(s.danger_map[t]*100).toFixed(1)}%</span></div>`).join("");
+  html += `</div></div>`;
+  const draw = ()=>{
+    const pts = (key)=>steps.map((x,i)=>[i+1, x[key]]);
+    lineChart(document.getElementById("c7"), [
+      {name:"V", points:pts("v")}, {name:"A", points:pts("adv"), color:"#e67e22"},
+      {name:"r_shaping", points:pts("r_shaping"), color:"#1e8449"}, {name:"r_terminal", points:pts("r_terminal"), color:"#c0392b"},
+    ], {zero:true, markX:k+1});
+  };
+  return {html, draw};
+}
+
+function render(){
+  const d = state.data, main = document.getElementById("main");
+  if (!d || !d.found){ main.innerHTML = `<div class="empty">没有找到 models/${state.run}_log.csv。先跑一次训练：<code>uv run python -m majiang.ml.rl --init models/discard.pt --out models/${state.run}.pt</code></div>`; return; }
+  const a = renderCurves(d), b = renderReplay(d);
+  main.innerHTML = a.html + b.html;
+  a.draw(); b.draw();
+  const last = d.rows[d.rows.length-1];
+  document.getElementById("status").textContent = `最近一轮 iter ${last.iter} · 日志更新于 ${new Date(d.mtime*1000).toLocaleTimeString()}`;
+}
+async function load(){
+  state.run = document.getElementById("run").value.trim() || "rl";
+  state.data = await (await fetch(`/api/train?run=${encodeURIComponent(state.run)}`)).json();
+  if (state.data.found && state.traceIter==null && state.data.traces.length) await loadTrace(state.data.traces[state.data.traces.length-1], false);
+  render();
+}
+async function loadTrace(it, rerender=true){
+  state.traceIter = it; state.step = 0;
+  const t = await (await fetch(`/api/train/trace?run=${encodeURIComponent(state.run)}&iter=${it}`)).json();
+  state.trace = t.found ? t : null;
+  if (rerender) render();
+}
+document.getElementById("load").onclick = ()=>{ state.traceIter=null; load(); };
+function schedule(){ if (state.timer) clearInterval(state.timer); state.timer = setInterval(()=>{ if (document.getElementById("live").checked) load(); }, 5000); }
+window.addEventListener("resize", render);
+load(); schedule();
+</script>
+</body>
+</html>

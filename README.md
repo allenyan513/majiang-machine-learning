@@ -54,6 +54,15 @@ uv run python -m majiang.ml.compare --candidates rule,nn:models/discard.pt,nn:mo
 
 两次尝试（旧计分 / 新计分各 60 轮）都**没有超过老师**：配对评估与监督模型无差别。新计分下单局分数标准差 1.6，400 局的评估曲线是纯噪声。分析见教程第 10、15 章。
 
+## 看见强化学习
+
+```bash
+uv run python -m majiang.ml.rl --init models/discard.pt --out models/rl.pt --iters 60 --games 1024 --eval-every 5 --eval-games 400
+uv run python -m web.server        # 打开 http://localhost:8000/train/ ，训练中每 5 秒刷新
+```
+
+训练面板除了分数曲线，还有**行为探针**（危险牌打出率、弃听率、第 8 巡向听、决策熵——分数是结果，这些是原因）和**一局回放**：每次评估用同一个 seed 录一局，按步看牌桌，每步显示价值估计 V、优势 A、塑形/终局奖励、打牌概率与危险度。checkpoint 在 `models/rl_ckpt/`。
+
 ## 可视化
 
 ```bash

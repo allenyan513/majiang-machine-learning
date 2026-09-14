@@ -7,6 +7,7 @@
     /            首页（web/index.html）
     /docs/       教程阅读器（web/docs/）
     /play/       单机游戏 / 观战（web/play/）
+    /train/      看 RL 训练：曲线 + 行为探针 + 带学习信号的对局回放（web/train/）
     /api/...     引擎 + 模型
 
 部署：监听地址和端口可用 --host/--port 或环境变量 HOST/PORT 指定（Cloud Run 注入 PORT）。
@@ -16,13 +17,17 @@ API（都返回 JSON）：
     POST /api/step?n=K             让 AI 执行最多 K 步；轮到人时停下
     POST /api/act?player=P&type=DISCARD&tile=T   人操作的动作
     GET  /api/state?view=P         状态；view=P 时只暴露 P 的手牌（玩家视角），省略 = 上帝视角
+    GET  /api/train?run=rl         训练日志（models/<run>_log.csv）+ checkpoint 列表
+    GET  /api/train/trace?run=rl&iter=N   第 N 轮录的那一局（models/<run>_ckpt/trace_N.json）
 
 分析面板：上帝视角显示当前决策者的分析；玩家视角只显示该座位的分析。
 """
 
 import argparse
+import csv
 import json
 import os
+import re
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -39,6 +44,34 @@ from majiang.engine.tile import to_str
 from majiang.ml.model import load
 
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(os.path.dirname(WEB_DIR), "models")
+
+
+def _safe_run(name: str) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9_\-]+", name):
+        raise ValueError("bad run name")
+    return name
+
+
+def train_log(run: str) -> dict:
+    """读 models/<run>_log.csv 和 checkpoint 目录，给曲线页用。"""
+    run = _safe_run(run)
+    log = os.path.join(MODELS_DIR, f"{run}_log.csv")
+    ckpt_dir = os.path.join(MODELS_DIR, f"{run}_ckpt")
+    if not os.path.exists(log):
+        return {"found": False, "run": run}
+    with open(log, newline="") as f:
+        rows = [{k: (float(v) if v not in ("", None) else None) for k, v in r.items()} for r in csv.DictReader(f)]
+    traces = sorted(int(m.group(1)) for fn in os.listdir(ckpt_dir) if (m := re.fullmatch(r"trace_(\d+)\.json", fn))) if os.path.isdir(ckpt_dir) else []
+    return {"found": True, "run": run, "rows": rows, "traces": traces, "mtime": os.path.getmtime(log)}
+
+
+def train_trace(run: str, it: int) -> dict:
+    path = os.path.join(MODELS_DIR, f"{_safe_run(run)}_ckpt", f"trace_{it:03d}.json")
+    if not os.path.exists(path):
+        return {"found": False}
+    with open(path) as f:
+        return {"found": True, **json.load(f)}
 
 
 class Session:
@@ -188,11 +221,15 @@ def make_handler(session: Session):
 
         def do_GET(self):
             u = urlparse(self.path)
+            q = parse_qs(u.query)
             if u.path == "/api/state":
-                q = parse_qs(u.query)
                 view = int(q["view"][0]) if "view" in q and q["view"][0] != "" else None
                 with session.lock:
                     return self._json(session.state(view))
+            if u.path == "/api/train":
+                return self._json(train_log(q.get("run", ["rl"])[0]))
+            if u.path == "/api/train/trace":
+                return self._json(train_trace(q.get("run", ["rl"])[0], int(q.get("iter", ["0"])[0])))
             return super().do_GET()  # /、/docs/、/play/ 都由各自目录的 index.html 提供
 
         def do_POST(self):
