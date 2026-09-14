@@ -249,4 +249,4 @@ AI：
 - [Botzone 国标麻将比赛](https://botzone.org.cn/static/gamecontest2026a.html) — 如果以后想走国标路线
 - Li et al., *Suphx: Mastering Mahjong with Deep Reinforcement Learning*, 2020
 
-← 上一章：[改进老师：规则决定了上限](13-defense.md) · 回到 [第 0 章 全景](00-overview.md)
+下一章：[改一行计分，重跑整条流水线](15-rescoring.md) · ← 上一章：[改进老师：规则决定了上限](13-defense.md)
