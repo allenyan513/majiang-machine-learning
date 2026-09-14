@@ -26,6 +26,7 @@ import numpy as np
 import torch
 
 from majiang.engine.game import Observation
+from majiang.engine.hand import MeldType
 
 COMPACT_SIZE = 308
 NUM_PLANES = 22
@@ -35,8 +36,7 @@ NO_TILE = 255
 def _meld_counts(melds) -> np.ndarray:
     c = np.zeros(34, dtype=np.uint8)
     for m in melds:
-        for t in m.tiles:
-            c[t] += 1
+        c[m.tile] += 3 if m.type == MeldType.PON else 4
     return c
 
 

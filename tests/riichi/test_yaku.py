@@ -1,7 +1,7 @@
-from majiang.engine.hand import Meld, MeldType
-from majiang.engine.score import base_points, payment
-from majiang.engine.tile import EAST, GREEN, RED, SOUTH, WHITE, counts_from_tiles, parse_hand
-from majiang.engine.yaku import WinContext, evaluate
+from majiang.riichi.hand import Meld, MeldType
+from majiang.riichi.score import base_points, payment
+from majiang.riichi.tile import EAST, GREEN, RED, SOUTH, WHITE, counts_from_tiles, parse_hand
+from majiang.riichi.yaku import WinContext, evaluate
 
 
 def ctx(hand: str, win: str, tsumo=False, melds=(), seat=SOUTH, rnd=EAST, **kw) -> WinContext:

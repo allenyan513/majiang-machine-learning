@@ -22,7 +22,7 @@ def test_generate_train_play(tmp_path):
     agent = NNAgent(load(str(out)), seed=1)
     for s in range(3):
         r = play_game([agent, RuleAgent(), RuleAgent(), agent], seed=s)
-        assert sum(r.deltas) <= 0
+        assert sum(r.scores) == 0
 
 
 def test_probs_only_on_tiles_in_hand():

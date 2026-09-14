@@ -7,8 +7,10 @@
 
 标准型公式（面子 m、搭子 t、对子 p）：
     shanten = 8 - 2*m - t - p，且约束 m + t <= 4
-七对：
-    shanten = 6 - 对子数（四张相同算两对）
+七对子（日麻）：
+    shanten = 6 - 对子数 + max(0, 7 - 牌的种类数)   四张相同只算一对，且要 7 种不同的牌
+国士无双：
+    shanten = 13 - 幺九种类数 - (有幺九对子 ? 1 : 0)
 
 实现分两层：
     1. 每个花色独立 DFS，枚举出所有可达的 (m, t, p) 三元组（带 lru_cache）
@@ -19,6 +21,7 @@
 from functools import lru_cache
 
 from .tile import NUM_TILE_TYPES, SUIT_SIZE, HONOR_START
+from .win import YAOCHU
 
 _MAX_T = 4  # 搭子数超过 4 没有意义，DFS 里直接封顶
 
@@ -113,11 +116,25 @@ def standard_shanten(counts: list[int], num_melds: int = 0) -> int:
 def seven_pairs_shanten(counts: list[int], num_melds: int = 0) -> int:
     if num_melds > 0:
         return 99
-    return 6 - sum(c // 2 for c in counts)
+    pairs = sum(1 for c in counts if c >= 2)
+    kinds = sum(1 for c in counts if c >= 1)
+    return 6 - pairs + max(0, 7 - kinds)
+
+
+def kokushi_shanten(counts: list[int], num_melds: int = 0) -> int:
+    if num_melds > 0:
+        return 99
+    kinds = sum(1 for t in YAOCHU if counts[t] >= 1)
+    has_pair = any(counts[t] >= 2 for t in YAOCHU)
+    return 13 - kinds - (1 if has_pair else 0)
 
 
 def shanten(counts: list[int], num_melds: int = 0) -> int:
-    return min(standard_shanten(counts, num_melds), seven_pairs_shanten(counts, num_melds))
+    return min(
+        standard_shanten(counts, num_melds),
+        seven_pairs_shanten(counts, num_melds),
+        kokushi_shanten(counts, num_melds),
+    )
 
 
 # ---------------------------------------------------------------- 牌效率

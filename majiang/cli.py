@@ -30,15 +30,15 @@ def main() -> None:
     for s in range(args.n):
         agents = [RandomAgent(seed=s * 4 + i) for i in range(4)]
         r = play_game(agents, seed=s, dealer=s % 4)
-        if r.kind != "win":
+        if r.winner is None:
             draws += 1
-        for w in r.wins:
-            wins[w.player] += 1
-            tsumo += w.from_player is None
+        else:
+            wins[r.winner] += 1
+            tsumo += r.is_tsumo
     dt = time.time() - t0
     print(f"{args.n} 局用时 {dt:.2f}s ({args.n / dt:.0f} 局/秒)")
-    print(f"流局 {draws} ({draws / args.n:.1%})   和牌 {args.n - draws}  其中自摸 {tsumo}")
-    print("各家和局:", dict(sorted(wins.items())))
+    print(f"流局 {draws} ({draws / args.n:.1%})   胡牌 {args.n - draws}  其中自摸 {tsumo}")
+    print("各家胜局:", dict(sorted(wins.items())))
 
 
 if __name__ == "__main__":

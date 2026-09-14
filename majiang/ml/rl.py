@@ -29,19 +29,14 @@ from majiang.agents.rule_agent import RuleAgent
 from majiang.engine.actions import Action, ActionType
 from majiang.engine.game import Game, Observation, Phase
 from majiang.engine.shanten import shanten
-from majiang.agents.nn_agent import legal_discard_mask
 from majiang.ml.features import encode_compact, expand
 from majiang.ml.model import ActorCritic, DiscardNet, load, save
 
-NEG = -1e9
-POINT_SCALE = 1000.0  # 终局奖励 = 点数变动 / 1000  # RL 里用大负数而不是 -inf 做 mask，这样 KL / 熵里 0 * (-1e9) 仍是 0，不会出 nan
+NEG = -1e9  # RL 里用大负数而不是 -inf 做 mask，这样 KL / 熵里 0 * (-1e9) 仍是 0，不会出 nan
 
 
-def masked(logits: torch.Tensor, x: torch.Tensor, legal: torch.Tensor | None = None) -> torch.Tensor:
-    mask = (x[:, 0] > 0) if legal is None else legal.to(logits.device)
-    if mask.dim() == 1:
-        mask = mask.unsqueeze(0).expand_as(logits)
-    return logits.masked_fill(~mask, NEG)
+def masked(logits: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    return logits.masked_fill(~(x[:, 0] > 0), NEG)
 
 
 # ============================================================ 采样（子进程）
@@ -77,18 +72,17 @@ class LearnerAgent(Agent):
         self.prev_phi: float | None = None
 
     def act(self, obs: Observation) -> Action:
+        by_type = {a.type: a for a in obs.legal_actions}
+        if obs.phase != Phase.DISCARD or ActionType.TSUMO in by_type:
+            return self.rule.act(obs)
         rule_action = self.rule.act(obs)
-        if obs.phase != Phase.DISCARD or rule_action.type != ActionType.DISCARD:
-            return rule_action
-        legal = legal_discard_mask(obs)
-        if int(legal.sum()) == 1:
+        if rule_action.type in (ActionType.ANKAN, ActionType.ADDKAN):
             return rule_action
 
         x = encode_compact(obs)
         with torch.no_grad():
-            xt = expand(x[None, :])
-            logits, v = self.model(xt)
-            logp_all = torch.log_softmax(masked(logits, xt, legal), -1)[0]
+            logits, v = self.model(expand(x[None, :]))
+            logp_all = torch.log_softmax(masked(logits, torch.as_tensor(expand(x[None, :]))), -1)[0]
         if self.greedy:
             a = int(logp_all.argmax())
         else:
@@ -130,8 +124,8 @@ def _rollout(args: tuple) -> dict:
         for p, t in trajs.items():
             if not t.a:
                 continue
-            t.r[-1] += g.result.deltas[p] / POINT_SCALE  # 终局奖励挂在最后一次决策上
-            scores.append(g.result.deltas[p] / POINT_SCALE)
+            t.r[-1] += g.result.scores[p]  # 终局奖励挂在最后一次决策上
+            scores.append(g.result.scores[p])
             X.extend(t.x); A.extend(t.a); LOGP.extend(t.logp); V.extend(t.v); R.extend(t.r)
             DONE.extend([False] * (len(t.a) - 1) + [True])
     return {
@@ -158,9 +152,9 @@ def _eval_games(args: tuple) -> dict:
             for p in g.players_to_act():
                 g.step(p, agents[p].act(g.observe(p)))
         assert g.result is not None
-        scores.append(g.result.deltas[seat] / POINT_SCALE)
-        wins += any(w.player == seat for w in g.result.wins)
-        deal_ins += any(w.from_player == seat for w in g.result.wins)
+        scores.append(g.result.scores[seat])
+        wins += g.result.winner == seat
+        deal_ins += g.result.loser == seat
     return {"scores": np.array(scores), "wins": wins, "deal_ins": deal_ins}
 
 

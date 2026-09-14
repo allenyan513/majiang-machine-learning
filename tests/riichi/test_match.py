@@ -1,6 +1,6 @@
-from majiang.agents.rule_agent import RuleAgent
-from majiang.engine.match import Match
-from majiang.engine.tile import EAST, SOUTH
+from majiang.riichi.rule_agent import RuleAgent
+from majiang.riichi.match import Match
+from majiang.riichi.tile import EAST, SOUTH
 
 
 def _play(m: Match) -> None:
@@ -38,7 +38,7 @@ def test_hanchan_reaches_south_round():
 
 
 def test_dealer_rotation_and_honba():
-    from majiang.engine.game import Result
+    from majiang.riichi.game import Result
 
     m = Match(seed=0, length="hanchan")
     m.finish_hand(Result("win", [], [1000, -1000, 0, 0], dealer_continues=True))
