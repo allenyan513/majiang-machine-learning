@@ -1,0 +1,11 @@
+# gcloud run deploy --source 上传源码时的过滤规则（没有这个文件 gcloud 会拿 .gitignore 顶替，把 models/ 全排除）
+.git
+.gitignore
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+data
+tests
+models/*
+!models/discard.pt

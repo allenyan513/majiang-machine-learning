@@ -1,7 +1,8 @@
 # 一个镜像跑全站：教程 + 单机游戏 + AI 分析 API
-#   docker build -f web/Dockerfile -t majiang-web .
+#   docker build -t majiang-web .
 #   docker run -p 8000:8000 majiang-web
 # 构建前先训练好 models/discard.pt（没有也能跑，nn 座位会降级成规则 bot）
+# 放在仓库根是为了 gcloud run deploy --source . 能直接找到它
 FROM python:3.11-slim
 
 WORKDIR /app
